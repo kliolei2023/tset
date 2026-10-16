@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>體育課雙滾輪體測系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* iPhone 風格滾輪外觀 */
+        .wheel-container {
+            height: 160px;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            position: relative;
+            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+        }
+        .wheel-item {
+            height: 40px;
+            scroll-snap-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #94a3b8;
+            transition: all 0.1s ease;
+        }
+        .wheel-item.selected {
+            color: #4f46e5;
+            font-size: 1.75rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- 頂部導航 -->
+    <header class="bg-indigo-600 text-white shadow-md p-4 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <span>🎡</span> 體育課雙滾輪體測系統
+            </h1>
+            <div class="flex flex-wrap gap-2 text-sm">
+                <label class="bg-indigo-700 hover:bg-indigo-800 px-3 py-2 rounded-lg cursor-pointer transition shadow flex items-center gap-1">
+                    📂 上傳名單 (Excel)
+                    <input type="file" id="excelInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="importExcel(event)">
+                </label>
+                <button onclick="exportExcel()" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-lg transition shadow flex items-center gap-1">
+                    📊 匯出 Excel
+                </button>
+                <button onclick="clearData()" class="bg-rose-700 hover:bg-rose-800 px-2 py-2 rounded-lg transition text-xs" title="清空全部">🗑️</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="max-w-4xl mx-auto p-4 flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- 左側：學生列表 -->
+        <div class="md:col-span-1 bg-white rounded-2xl shadow-sm p-4 flex flex-col h-[75vh]">
+            <div class="mb-3">
+                <input type="text" id="searchInput" placeholder="🔍 搜尋姓名或學號..." oninput="renderStudentList()" 
+                    class="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            
+            <div class="flex justify-between items-center text-xs text-slate-500 mb-2 px-1">
+                <span id="studentCount">共 0 位學生</span>
+                <span id="completedCount" class="text-emerald-600 font-semibold">已測: 0</span>
+            </div>
+
+            <div id="studentListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                <div class="text-center text-slate-400 py-10 text-sm">請先上傳 Excel 名單，或直接在下方新增。</div>
+            </div>
+
+            <div class="mt-3 pt-3 border-t flex gap-2">
+                <input type="text" id="quickName" placeholder="學生姓名" class="flex-1 px-3 py-1.5 border rounded-lg text-sm">
+                <button onclick="addSingleStudent()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-indigo-700">新增</button>
+            </div>
+        </div>
+
+        <!-- 右側：雙滾輪量測面板 -->
+        <div id="measurePanel" class="md:col-span-2 bg-white rounded-2xl shadow-sm p-6 flex flex-col justify-between hidden">
+            <div>
+                <!-- 當前學生標題與狀態 -->
+                <div class="flex justify-between items-start border-b pb-4 mb-4">
+                    <div>
+                        <span id="activeId" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-mono">ID</span>
+                        <h2 id="activeName" class="text-2xl font-bold text-slate-800 mt-1">請選擇學生</h2>
+                        <p id="activeClass" class="text-sm text-slate-500"></p>
+                    </div>
+                    <div class="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button onclick="setStatus('未測')" id="btnStatus0" class="px-3 py-1.5 text-xs rounded-lg font-medium transition">未測</button>
+                        <button onclick="setStatus('已測')" id="btnStatus1" class="px-3 py-1.5 text-xs rounded-lg font-medium transition">已測</button>
+                        <button onclick="setStatus('缺席')" id="btnStatus2" class="px-3 py-1.5 text-xs rounded-lg font-medium transition">缺席/下一課</button>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- 身高區塊：整數 + 小數 -->
+                    <div class="bg-slate-50 p-3 rounded-2xl border">
+                        <div class="flex justify-between items-center mb-2 px-2">
+                            <label class="font-semibold text-slate-700 text-sm">身高 (cm)</label>
+                            <span id="heightDisplay" class="text-lg font-bold text-indigo-600 font-mono">-- cm</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- 身高整數輪 -->
+                            <div class="relative text-center">
+                                <span class="text-xs text-slate-400 block mb-1">整數 (cm)</span>
+                                <div id="heightIntWheel" class="wheel-container no-scrollbar bg-white rounded-xl border" onscroll="handleWheelScroll('heightInt')"></div>
+                                <div class="absolute inset-x-0 top-[48px] h-[40px] border-t border-b border-indigo-400 pointer-events-none bg-indigo-50/20"></div>
+                            </div>
+                            <!-- 身高小數輪 (.0 - .9) -->
+                            <div class="relative text-center">
+                                <span class="text-xs text-slate-400 block mb-1">小數 (.0 - .9)</span>
+                                <div id="heightDecWheel" class="wheel-container no-scrollbar bg-white rounded-xl border" onscroll="handleWheelScroll('heightDec')"></div>
+                                <div class="absolute inset-x-0 top-[48px] h-[40px] border-t border-b border-indigo-400 pointer-events-none bg-indigo-50/20"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 體重區塊：整數 + 小數 -->
+                    <div class="bg-slate-50 p-3 rounded-2xl border">
+                        <div class="flex justify-between items-center mb-2 px-2">
+                            <label class="font-semibold text-slate-700 text-sm">體重 (kg)</label>
+                            <span id="weightDisplay" class="text-lg font-bold text-emerald-600 font-mono">-- kg</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- 體重整數輪 -->
+                            <div class="relative text-center">
+                                <span class="text-xs text-slate-400 block mb-1">整數 (kg)</span>
+                                <div id="weightIntWheel" class="wheel-container no-scrollbar bg-white rounded-xl border" onscroll="handleWheelScroll('weightInt')"></div>
+                                <div class="absolute inset-x-0 top-[48px] h-[40px] border-t border-b border-emerald-400 pointer-events-none bg-emerald-50/20"></div>
+                            </div>
+                            <!-- 體重小數輪 (.0 - .9) -->
+                            <div class="relative text-center">
+                                <span class="text-xs text-slate-400 block mb-1">小數 (.0 - .9)</span>
+                                <div id="weightDecWheel" class="wheel-container no-scrollbar bg-white rounded-xl border" onscroll="handleWheelScroll('weightDec')"></div>
+                                <div class="absolute inset-x-0 top-[48px] h-[40px] border-t border-b border-emerald-400 pointer-events-none bg-emerald-50/20"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部操作按鈕 -->
+            <div class="mt-6 flex gap-3">
+                <button onclick="saveAndNext()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2">
+                    💾 儲存並跳至下一位
+                </button>
+                <button onclick="saveCurrent()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-3.5 rounded-xl font-semibold transition">
+                    僅儲存
+                </button>
+            </div>
+        </div>
+
+        <!-- 尚未選擇提示 -->
+        <div id="emptyPanel" class="md:col-span-2 bg-white rounded-2xl shadow-sm p-12 flex flex-col items-center justify-center text-slate-400 text-center">
+            <span class="text-5xl mb-3">👆</span>
+            <p class="text-base font-medium">請從左側點選一位學生，使用雙滾輪上下滑動記錄</p>
+            <p class="text-xs text-slate-400 mt-1">資料即時自動保存在本地瀏覽器，不怕關閉網頁</p>
+        </div>
+
+    </main>
+
+    <script>
+        let students = [];
+        let activeStudentId = null;
+
+        // 產生滾輪選項資料 (身高整數 100-210, 體重整數 20-130, 小數統一 0-9)
+        const heightInts = []; for (let i = 100; i <= 210; i++) heightInts.push(String(i));
+        const heightDecs = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']; // 已改為 .0 - .9
+        
+        const weightInts = []; for (let i = 20; i <= 130; i++) weightInts.push(String(i));
+        const weightDecs = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+        window.onload = function() {
+            buildWheel('heightIntWheel', heightInts);
+            buildWheel('heightDecWheel', heightDecs);
+            buildWheel('weightIntWheel', weightInts);
+            buildWheel('weightDecWheel', weightDecs);
+
+            const savedData = localStorage.getItem('pe_double_wheel_students_v2');
+            if (savedData) {
+                try {
+                    students = JSON.parse(savedData);
+                    renderStudentList();
+                } catch(e) { console.error(e); }
+            }
+        };
+
+        function buildWheel(containerId, options) {
+            const container = document.getElementById(containerId);
+            let html = '<div style="height: 60px;"></div>';
+            options.forEach(opt => {
+                html += `<div class="wheel-item" data-value="${opt}">${opt}</div>`;
+            });
+            html += '<div style="height: 60px;"></div>';
+            container.innerHTML = html;
+        }
+
+        function saveDataToLocal() {
+            localStorage.setItem('pe_double_wheel_students_v2', JSON.stringify(students));
+            renderStudentList();
+        }
+
+        // 滾動防抖與數值即時計算
+        let scrollTimeouts = {};
+        function handleWheelScroll(type) {
+            clearTimeout(scrollTimeouts[type]);
+            scrollTimeouts[type] = setTimeout(() => {
+                const container = document.getElementById(type + 'Wheel');
+                const itemHeight = 40;
+                const index = Math.round(container.scrollTop / itemHeight);
+                const items = container.querySelectorAll('.wheel-item');
+                
+                items.forEach((item, idx) => {
+                    if (idx === index) {
+                        item.classList.add('selected');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+
+                updateCombinedValue();
+            }, 50);
+        }
+
+        function scrollToWheelValue(type, targetVal) {
+            const container = document.getElementById(type + 'Wheel');
+            const items = container.querySelectorAll('.wheel-item');
+            let found = false;
+            items.forEach((item, idx) => {
+                if (item.getAttribute('data-value') === String(targetVal)) {
+                    container.scrollTop = idx * 40;
+                    item.classList.add('selected');
+                    found = true;
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+            if (!found && items.length > 0) {
+                container.scrollTop = 0;
+                items[0].classList.add('selected');
+            }
+        }
+
+        // 組合整數與小數並更新學生資料
+        function updateCombinedValue() {
+            if (!activeStudentId) return;
+            const student = students.find(s => s.id === activeStudentId);
+            if (!student) return;
+
+            // 取得身高整數與小數
+            const hInt = getSelectedValue('heightInt');
+            const hDec = getSelectedValue('heightDec');
+            if (hInt) {
+                student.height = `${hInt}.${hDec}`;
+                document.getElementById('heightDisplay').innerText = `${student.height} cm`;
+            }
+
+            // 取得體重整數與小數
+            const wInt = getSelectedValue('weightInt');
+            const wDec = getSelectedValue('weightDec');
+            if (wInt) {
+                student.weight = `${wInt}.${wDec}`;
+                document.getElementById('weightDisplay').innerText = `${student.weight} kg`;
+            }
+
+            if ((student.height || student.weight) && student.status === '未測') {
+                student.status = '已測';
+                updateStatusButtons('已測');
+            }
+            saveDataToLocal();
+        }
+
+        function getSelectedValue(type) {
+            const container = document.getElementById(type + 'Wheel');
+            const itemHeight = 40;
+            const index = Math.round(container.scrollTop / itemHeight);
+            const items = container.querySelectorAll('.wheel-item');
+            if (items[index]) {
+                return items[index].getAttribute('data-value');
+            }
+            return null;
+        }
+
+        // Excel 匯入
+        function importExcel(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(sheet);
+
+                    students = json.map((row, index) => ({
+                        id: String(row['學號'] || row['ID'] || (index + 1)),
+                        name: String(row['姓名'] || row['名字'] || '未命名'),
+                        class: String(row['班別'] || row['班級'] || ''),
+                        height: row['身高'] ? String(row['身高']) : '',
+                        weight: row['體重'] ? String(row['體重']) : '',
+                        status: row['狀態'] || '未測'
+                    }));
+                    saveDataToLocal();
+                    alert(`成功匯入 ${students.length} 位學生！`);
+                } catch (err) {
+                    alert('匯入失敗，請確認 Excel 格式。');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Excel 匯出
+        function exportExcel() {
+            if (students.length === 0) { alert('沒有資料可匯出！'); return; }
+            const exportData = students.map(s => ({
+                '學號': s.id, '姓名': s.name, '班別': s.class,
+                '身高': s.height, '體重': s.weight, '狀態': s.status
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "體測記錄");
+            XLSX.writeFile(wb, `體測雙滾輪記錄_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        function renderStudentList() {
+            const container = document.getElementById('studentListContainer');
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = students.filter(s => s.name.toLowerCase().includes(keyword) || s.id.toLowerCase().includes(keyword));
+
+            document.getElementById('studentCount').innerText = `共 ${students.length} 位學生`;
+            document.getElementById('completedCount').innerText = `已測: ${students.filter(s => s.status === '已測').length}`;
+
+            if (students.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-400 py-10 text-sm">尚無名單，請上方上傳 Excel 或下方新增。</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(s => {
+                let badge = 'bg-slate-100 text-slate-600';
+                if (s.status === '已測') badge = 'bg-emerald-100 text-emerald-700 font-semibold';
+                if (s.status === '缺席') badge = 'bg-amber-100 text-amber-700';
+                const isActive = s.id === activeStudentId ? 'ring-2 ring-indigo-500 bg-indigo-50/50' : 'hover:bg-slate-50';
+
+                return `
+                    <div onclick="selectStudent('${s.id}')" class="p-3 rounded-xl border cursor-pointer transition flex justify-between items-center ${isActive}">
+                        <div>
+                            <div class="font-bold text-slate-800">${s.name} <span class="text-xs font-normal text-slate-400">#${s.id}</span></div>
+                            <div class="text-xs text-slate-500 mt-0.5">身高: ${s.height || '--'}cm | 體重: ${s.weight || '--'}kg</div>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded-full ${badge}">${s.status}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectStudent(id) {
+            activeStudentId = id;
+            const student = students.find(s => s.id === id);
+            if (!student) return;
+
+            document.getElementById('emptyPanel').classList.add('hidden');
+            document.getElementById('measurePanel').classList.remove('hidden');
+
+            document.getElementById('activeId').innerText = `學號: ${student.id}`;
+            document.getElementById('activeName').innerText = student.name;
+            document.getElementById('activeClass').innerText = student.class ? `班別: ${student.class}` : '';
+
+            // 解析並設定身高滾輪位置 (如 170.5)
+            let hVal = student.height ? String(student.height) : "165.0";
+            let hParts = hVal.includes('.') ? hVal.split('.') : [hVal, '0'];
+            scrollToWheelValue('heightInt', hParts[0] || "165");
+            scrollToWheelValue('heightDec', hParts[1] || "0");
+            document.getElementById('heightDisplay').innerText = `${hVal} cm`;
+
+            // 解析並設定體重滾輪位置 (如 55.2)
+            let wVal = student.weight ? String(student.weight) : "55.0";
+            let wParts = wVal.includes('.') ? wVal.split('.') : [wVal, '0'];
+            scrollToWheelValue('weightInt', wParts[0] || "55");
+            scrollToWheelValue('weightDec', wParts[1] || "0");
+            document.getElementById('weightDisplay').innerText = `${wVal} kg`;
+
+            updateStatusButtons(student.status);
+            renderStudentList();
+        }
+
+        function setStatus(status) {
+            const student = students.find(s => s.id === activeStudentId);
+            if (!student) return;
+            student.status = status;
+            updateStatusButtons(status);
+            saveDataToLocal();
+        }
+
+        function updateStatusButtons(status) {
+            ['未測', '已測', '缺席'].forEach((st, idx) => {
+                const btn = document.getElementById(`btnStatus${idx}`);
+                btn.className = st === status ? 
+                    "px-3 py-1.5 text-xs rounded-lg font-bold bg-indigo-600 text-white shadow" : 
+                    "px-3 py-1.5 text-xs rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200";
+            });
+        }
+
+        function saveAndNext() {
+            const idx = students.findIndex(s => s.id === activeStudentId);
+            if (idx !== -1 && idx < students.length - 1) {
+                selectStudent(students[idx + 1].id);
+            } else {
+                alert('已經是最後一位學生了！');
+            }
+        }
+
+        function saveCurrent() {
+            alert('已儲存！');
+        }
+
+        function addSingleStudent() {
+            const input = document.getElementById('quickName');
+            const name = input.value.trim();
+            if (!name) return;
+            const newS = { id: String(students.length + 101), name: name, class: '', height: '', weight: '', status: '未測' };
+            students.push(newS);
+            input.value = '';
+            saveDataToLocal();
+            selectStudent(newS.id);
+        }
+
+        function clearData() {
+            if (confirm('確定要清空全部資料嗎？')) {
+                students = [];
+                activeStudentId = null;
+                localStorage.removeItem('pe_double_wheel_students_v2');
+                document.getElementById('measurePanel').classList.add('hidden');
+                document.getElementById('emptyPanel').classList.remove('hidden');
+                renderStudentList();
+            }
+        }
+    </script>
+</body>
+</html>
