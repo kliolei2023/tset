@@ -545,10 +545,10 @@
           </div>
           <span style="font-size: 1.2rem;">🏃</span>
         </div>
-        <div class="item-card" onclick="selectItem(6, '立定跳遠', 'cm', 30, 250, false)">
+        <div class="item-card" onclick="selectItem(6, '立定跳遠', 'cm', 0, 0, false, 'customJump')">
           <div>
             <div class="name">立定跳遠</div>
-            <div class="unit">單位: cm</div>
+            <div class="unit">&lt;80不合格, 80-100(+5), &gt;100(+1)</div>
           </div>
           <span style="font-size: 1.2rem;">👟</span>
         </div>
@@ -652,11 +652,13 @@
       minVal: 0,
       maxVal: 200,
       inputType: 'number',
+      customJumpOptions: [], // 立定跳遠客製化選單列表
       rawData: [],
       activeStudentIndex: null,
       tempInt: 0,
       tempDec: 0,
-      tempToggle: '無'
+      tempToggle: '無',
+      tempCustomIndex: 0
     };
 
     const ITEM_HEIGHT = 40;
@@ -674,6 +676,12 @@
       document.getElementById('openConfig').addEventListener('click', () => {
         document.getElementById('configModal').classList.add('open');
       });
+
+      // 預先建置立定跳遠特規選項: 不合格, 80, 85, 90, 95, 100, 101, 102...250
+      state.customJumpOptions = ['不合格', 80, 85, 90, 95];
+      for (let i = 100; i <= 250; i++) {
+        state.customJumpOptions.push(i);
+      }
 
       setupWheelTouch('intWheelCol', 'intScroll', true);
       setupWheelTouch('decWheelCol', 'decScroll', false);
@@ -779,13 +787,22 @@
         card.className = `student-card ${hasVal ? 'has-value' : ''}`;
         card.onclick = () => openPicker(i, name, val);
 
+        let displayVal = '未填寫 ✍️';
+        if (hasVal) {
+          if (val === '不合格') {
+            displayVal = '❌ 不合格';
+          } else {
+            displayVal = val + ' ' + state.fieldUnit;
+          }
+        }
+
         card.innerHTML = `
           <div class="student-info">
             <div class="student-no">${num}</div>
             <div class="student-name">${name}</div>
           </div>
           <div class="student-value ${hasVal ? 'filled' : ''}">
-            ${hasVal ? val + ' ' + state.fieldUnit : '未填寫 ✍️'}
+            ${displayVal}
           </div>
         `;
 
@@ -803,6 +820,24 @@
         document.getElementById('toggleContainer').style.display = 'flex';
         document.getElementById('currentValDisplay').textContent = currentVal || '未設定';
         selectToggleVal(currentVal === '有' ? '有' : '無');
+      } else if (state.inputType === 'customJump') {
+        document.getElementById('wheelContainer').style.display = 'flex';
+        document.getElementById('toggleContainer').style.display = 'none';
+        document.getElementById('decWheelCol').style.display = 'none';
+
+        let idx = 0;
+        if (currentVal === '不合格') {
+          idx = 0;
+        } else if (currentVal !== undefined && currentVal !== '') {
+          const num = parseInt(currentVal);
+          const foundIdx = state.customJumpOptions.indexOf(num);
+          if (foundIdx !== -1) idx = foundIdx;
+        }
+
+        state.tempCustomIndex = idx;
+        buildCustomJumpItems();
+        scrollToCustomIndex(idx);
+        updateDisplayVal();
       } else {
         document.getElementById('wheelContainer').style.display = 'flex';
         document.getElementById('toggleContainer').style.display = 'none';
@@ -855,6 +890,19 @@
       }
     }
 
+    function buildCustomJumpItems() {
+      const intScroll = document.getElementById('intScroll');
+      intScroll.innerHTML = '';
+
+      state.customJumpOptions.forEach((opt, idx) => {
+        const item = document.createElement('div');
+        item.className = 'wheel-item';
+        item.textContent = opt === '不合格' ? '不合格 (<80)' : opt;
+        item.dataset.val = opt;
+        intScroll.appendChild(item);
+      });
+    }
+
     function scrollToValue(intVal, decVal) {
       const intScroll = document.getElementById('intScroll');
       const intIdx = Math.max(0, intVal - state.minVal);
@@ -865,6 +913,12 @@
         decScroll.style.transform = `translateY(${-decVal * ITEM_HEIGHT}px)`;
       }
 
+      updateWheelItemStyles();
+    }
+
+    function scrollToCustomIndex(idx) {
+      const intScroll = document.getElementById('intScroll');
+      intScroll.style.transform = `translateY(${-idx * ITEM_HEIGHT}px)`;
       updateWheelItemStyles();
     }
 
@@ -895,7 +949,13 @@
         const delta = y - startY;
         let targetY = currentTransY + delta;
 
-        const maxLen = isInt ? (state.maxVal - state.minVal + 1) : 10;
+        let maxLen = 10;
+        if (state.inputType === 'customJump') {
+          maxLen = state.customJumpOptions.length;
+        } else {
+          maxLen = isInt ? (state.maxVal - state.minVal + 1) : 10;
+        }
+
         const maxTrans = -(maxLen - 1) * ITEM_HEIGHT;
 
         if (targetY > 0) targetY *= 0.3;
@@ -911,7 +971,13 @@
         scroll.style.transition = 'transform 0.15s cubic-bezier(0,0,0.2,1)';
 
         let rawY = getTransY();
-        const maxLen = isInt ? (state.maxVal - state.minVal + 1) : 10;
+        let maxLen = 10;
+        if (state.inputType === 'customJump') {
+          maxLen = state.customJumpOptions.length;
+        } else {
+          maxLen = isInt ? (state.maxVal - state.minVal + 1) : 10;
+        }
+
         let index = Math.round(-rawY / ITEM_HEIGHT);
 
         if (index < 0) index = 0;
@@ -920,7 +986,9 @@
         const finalY = -index * ITEM_HEIGHT;
         scroll.style.transform = `translateY(${finalY}px)`;
 
-        if (isInt) {
+        if (state.inputType === 'customJump') {
+          state.tempCustomIndex = index;
+        } else if (isInt) {
           state.tempInt = state.minVal + index;
         } else {
           state.tempDec = index;
@@ -960,7 +1028,14 @@
     }
 
     function updateDisplayVal() {
-      if (state.hasDecimal) {
+      if (state.inputType === 'customJump') {
+        const val = state.customJumpOptions[state.tempCustomIndex];
+        if (val === '不合格') {
+          document.getElementById('currentValDisplay').textContent = '不合格';
+        } else {
+          document.getElementById('currentValDisplay').textContent = `${val} cm`;
+        }
+      } else if (state.hasDecimal) {
         document.getElementById('currentValDisplay').textContent = `${state.tempInt}.${state.tempDec} ${state.fieldUnit}`;
       } else {
         document.getElementById('currentValDisplay').textContent = `${state.tempInt} ${state.fieldUnit}`;
@@ -978,6 +1053,8 @@
       let finalVal = '';
       if (state.inputType === 'toggle') {
         finalVal = state.tempToggle;
+      } else if (state.inputType === 'customJump') {
+        finalVal = state.customJumpOptions[state.tempCustomIndex];
       } else {
         finalVal = state.hasDecimal ? parseFloat(`${state.tempInt}.${state.tempDec}`) : state.tempInt;
       }
