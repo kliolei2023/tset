@@ -233,21 +233,16 @@
     }
 
     .student-no {
-      font-size: 0.9rem;
-      font-weight: 700;
+      font-size: 1.1rem;
+      font-weight: 800;
       background: var(--primary-light);
       color: var(--primary);
-      width: 34px;
-      height: 34px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-    }
-
-    .student-name {
-      font-size: 1.1rem;
-      font-weight: 700;
     }
 
     .student-value {
@@ -265,6 +260,12 @@
 
     .nav-buttons {
       margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .button-group {
       display: flex;
       gap: 10px;
     }
@@ -285,6 +286,7 @@
 
     .btn-secondary { background: #e2e8f0; color: #334155; }
     .btn-primary { background: var(--primary); color: white; }
+    .btn-excel { background: #10b981; color: white; }
 
     /* Modal iOS Picker */
     .modal-overlay {
@@ -488,26 +490,26 @@
   <div class="container">
     <!-- 步驟 1：選擇班別 -->
     <div class="step-page active" id="step1">
-      <div class="section-title">請選擇班別 (工作表分頁)</div>
+      <div class="section-title">請選擇班別</div>
       <div class="grid-selector">
-        <div class="card-btn" onclick="selectClass('小一敬')">
-          <div class="title">小一敬</div>
+        <div class="card-btn" onclick="selectClass('A班')">
+          <div class="title">A 班</div>
           <div class="subtitle">點擊進入</div>
         </div>
-        <div class="card-btn" onclick="selectClass('小一靜')">
-          <div class="title">小一靜</div>
+        <div class="card-btn" onclick="selectClass('B班')">
+          <div class="title">B 班</div>
           <div class="subtitle">點擊進入</div>
         </div>
-        <div class="card-btn" onclick="selectClass('小一恒')">
-          <div class="title">小一恒</div>
+        <div class="card-btn" onclick="selectClass('C班')">
+          <div class="title">C 班</div>
           <div class="subtitle">點擊進入</div>
         </div>
-        <div class="card-btn" onclick="selectClass('小一毅')">
-          <div class="title">小一毅</div>
+        <div class="card-btn" onclick="selectClass('D班')">
+          <div class="title">D 班</div>
           <div class="subtitle">點擊進入</div>
         </div>
-        <div class="card-btn" onclick="selectClass('小一愛')" style="grid-column: span 2;">
-          <div class="title">小一愛</div>
+        <div class="card-btn" onclick="selectClass('E班')" style="grid-column: span 2;">
+          <div class="title">E 班</div>
           <div class="subtitle">點擊進入</div>
         </div>
       </div>
@@ -577,8 +579,11 @@
       <div class="section-title" id="studentListTitle">學生列表</div>
       <div class="student-list" id="studentList"></div>
       <div class="nav-buttons">
-        <button class="btn btn-secondary" onclick="goToStep(2)">⬅️ 重選項目</button>
-        <button class="btn btn-primary" onclick="fetchData()">🔄 重新載入</button>
+        <button class="btn btn-excel" onclick="exportToExcel()">📥 匯出當前班級 Excel (.csv)</button>
+        <div class="button-group">
+          <button class="btn btn-secondary" onclick="goToStep(2)">⬅️ 重選項目</button>
+          <button class="btn btn-primary" onclick="fetchData()">🔄 重新載入</button>
+        </div>
       </div>
     </div>
   </div>
@@ -588,7 +593,7 @@
     <div class="picker-modal">
       <div class="picker-header">
         <div>
-          <div class="picker-title" id="pStudentName">甘子月</div>
+          <div class="picker-title" id="pStudentName">學號：1 號</div>
           <div class="picker-subtitle" id="pItemName">項目：身高 (cm)</div>
         </div>
         <button class="icon-btn" onclick="closePicker()">✕</button>
@@ -652,7 +657,7 @@
       minVal: 0,
       maxVal: 200,
       inputType: 'number',
-      customJumpOptions: [], // 立定跳遠客製化選單列表
+      customJumpOptions: [],
       rawData: [],
       activeStudentIndex: null,
       tempInt: 0,
@@ -677,7 +682,7 @@
         document.getElementById('configModal').classList.add('open');
       });
 
-      // 預先建置立定跳遠特規選項: 不合格, 80, 85, 90, 95, 100, 101, 102...250
+      // 立定跳遠客製化選單: 不合格, 80, 85, 90, 95, 100~250
       state.customJumpOptions = ['不合格', 80, 85, 90, 95];
       for (let i = 100; i <= 250; i++) {
         state.customJumpOptions.push(i);
@@ -724,7 +729,11 @@
       if (localCache) {
         state.rawData = JSON.parse(localCache);
       } else {
-        state.rawData = [];
+        // 預設生成 35 位學生骨架，防止無網路時打不開
+        state.rawData = [["學號", "姓名", "身高", "體重", "手握力", "折返跑", "立定跳遠", "眼鏡", "出生年份"]];
+        for (let i = 1; i <= 35; i++) {
+          state.rawData.push([i, ``, "", "", "", "", "", "", ""]);
+        }
       }
       goToStep(2);
       fetchData();
@@ -739,7 +748,7 @@
       state.hasDecimal = hasDec;
       state.inputType = type;
 
-      document.getElementById('studentListTitle').textContent = `${state.currentClass} - ${state.fieldName} 數據列表`;
+      document.getElementById('studentListTitle').textContent = `${state.currentClass} - ${state.fieldName}`;
       goToStep(3);
       renderStudentList();
     }
@@ -753,7 +762,7 @@
         const res = await fetch(`${state.apiUrl}?action=read&sheetName=${encodeURIComponent(state.currentClass)}`);
         const json = await res.json();
 
-        if (json.status === 'success') {
+        if (json.status === 'success' && json.data && json.data.length > 0) {
           state.rawData = json.data;
           localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
           updateSyncStatus('online', '● 已同步');
@@ -761,16 +770,16 @@
             renderStudentList();
           }
         } else {
-          updateSyncStatus('offline', '● 載入失敗');
+          updateSyncStatus('offline', '● 離線模式 (用本機數據)');
         }
       } catch (e) {
-        updateSyncStatus('offline', '● 離線模式');
+        updateSyncStatus('offline', '● 離線模式 (已暫存)');
       }
     }
 
     function renderStudentList() {
       if (!state.rawData || state.rawData.length <= 1) {
-        studentList.innerHTML = `<div class="empty-state">尚無數據，請確認已連線或點擊「重新載入」</div>`;
+        studentList.innerHTML = `<div class="empty-state">尚無數據，已為您準備本機暫存環境</div>`;
         return;
       }
 
@@ -778,14 +787,13 @@
 
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
-        const num = row[0] || i;
-        const name = row[1] || '學生';
+        const num = row[0] || i; // 只取學號
         const val = row[state.currentField];
         const hasVal = val !== undefined && val !== '';
 
         const card = document.createElement('div');
         card.className = `student-card ${hasVal ? 'has-value' : ''}`;
-        card.onclick = () => openPicker(i, name, val);
+        card.onclick = () => openPicker(i, num, val);
 
         let displayVal = '未填寫 ✍️';
         if (hasVal) {
@@ -799,7 +807,6 @@
         card.innerHTML = `
           <div class="student-info">
             <div class="student-no">${num}</div>
-            <div class="student-name">${name}</div>
           </div>
           <div class="student-value ${hasVal ? 'filled' : ''}">
             ${displayVal}
@@ -810,9 +817,9 @@
       }
     }
 
-    function openPicker(rowIndex, studentName, currentVal) {
+    function openPicker(rowIndex, studentNo, currentVal) {
       state.activeStudentIndex = rowIndex;
-      document.getElementById('pStudentName').textContent = `${rowIndex}. ${studentName}`;
+      document.getElementById('pStudentName').textContent = `學號：${studentNo} 號`;
       document.getElementById('pItemName').textContent = `項目：${state.fieldName} ${state.fieldUnit ? '(' + state.fieldUnit + ')' : ''}`;
 
       if (state.inputType === 'toggle') {
@@ -894,7 +901,7 @@
       const intScroll = document.getElementById('intScroll');
       intScroll.innerHTML = '';
 
-      state.customJumpOptions.forEach((opt, idx) => {
+      state.customJumpOptions.forEach((opt) => {
         const item = document.createElement('div');
         item.className = 'wheel-item';
         item.textContent = opt === '不合格' ? '不合格 (<80)' : opt;
@@ -1060,10 +1067,14 @@
       }
 
       state.rawData[state.activeStudentIndex][state.currentField] = finalVal;
+
+      // 1. 強制優先寫入本機備份防錯 (LocalStorage)
       localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
 
       renderStudentList();
       closePicker();
+
+      // 2. 背景同步上傳 Google Sheets
       autoUpload();
     }
 
@@ -1073,6 +1084,28 @@
       renderStudentList();
       closePicker();
       autoUpload();
+    }
+
+    // 防錯功能：本機下載 Excel CSV 備份檔
+    function exportToExcel() {
+      if (!state.rawData || state.rawData.length === 0) {
+        alert('尚無數據可供匯出！');
+        return;
+      }
+
+      let csvContent = "\uFEFF"; // UTF-8 BOM，避免 Excel 開啟中文亂碼
+      state.rawData.forEach(row => {
+        csvContent += row.join(",") + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `體測數據_${state.currentClass}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     async function autoUpload() {
@@ -1096,10 +1129,10 @@
         if (json.status === 'success') {
           updateSyncStatus('online', '● 已連線同步');
         } else {
-          updateSyncStatus('offline', '● 儲存失敗');
+          updateSyncStatus('offline', '● 儲存失敗 (已暫存本機)');
         }
       } catch (err) {
-        updateSyncStatus('offline', '● 離線 (已暫存)');
+        updateSyncStatus('offline', '● 離線 (已暫存本機)');
       }
     }
 
