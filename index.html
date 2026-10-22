@@ -510,30 +510,11 @@
   </div>
 
   <div class="container">
-    <!-- 步驟 1：選擇班別 -->
+    <!-- 步驟 1：動態載入分頁名稱（離線時使用預設 A~E 班） -->
     <div class="step-page active" id="step1">
       <div class="section-title">請選擇班別</div>
-      <div class="grid-selector">
-        <div class="card-btn" onclick="selectClass('A班')">
-          <div class="title">A 班</div>
-          <div class="subtitle">點擊進入</div>
-        </div>
-        <div class="card-btn" onclick="selectClass('B班')">
-          <div class="title">B 班</div>
-          <div class="subtitle">點擊進入</div>
-        </div>
-        <div class="card-btn" onclick="selectClass('C班')">
-          <div class="title">C 班</div>
-          <div class="subtitle">點擊進入</div>
-        </div>
-        <div class="card-btn" onclick="selectClass('D班')">
-          <div class="title">D 班</div>
-          <div class="subtitle">點擊進入</div>
-        </div>
-        <div class="card-btn" onclick="selectClass('E班')" style="grid-column: span 2;">
-          <div class="title">E 班</div>
-          <div class="subtitle">點擊進入</div>
-        </div>
+      <div class="grid-selector" id="classSelectorGrid">
+        <div class="card-btn" style="grid-column: span 2; color: var(--text-muted);">正在載入雲端分頁班級...</div>
       </div>
     </div>
 
@@ -665,7 +646,7 @@
       <div class="help-box" id="helpBox" style="display: none;">
         <strong>💡 如何建立自己的試算表並取得 URL？</strong>
         <ol>
-          <li>建立自己的 <b>Google 試算表</b>，建立分頁：<code>A班</code>、<code>B班</code>、<code>C班</code>、<code>D班</code>、<code>E班</code>。</li>
+          <li>建立自己的 <b>Google 試算表</b>，建立對應的分頁名稱。</li>
           <li>點擊上方選單 <b>「擴充功能」>「Apps Script」</b>。</li>
           <li>貼上對應的後端程式碼並點擊右上角 <b>「部署」>「新增部署作業」</b>。</li>
           <li>類型選擇 <b>「網頁應用程式」</b>，存取權選 <b>「所有人」</b>。</li>
@@ -687,6 +668,7 @@
 
     let state = {
       apiUrl: localStorage.getItem('gas_api_url') || DEFAULT_API_URL,
+      classList: [],
       currentClass: '',
       currentField: 2,
       fieldName: '',
@@ -727,6 +709,9 @@
 
       setupWheelTouch('intWheelCol', 'intScroll', true);
       setupWheelTouch('decWheelCol', 'decScroll', false);
+
+      // 初始化時取得雲端分頁名稱
+      fetchClassList();
     }
 
     function toggleHelp() {
@@ -745,7 +730,68 @@
         localStorage.setItem('gas_api_url', url);
         closeConfigModal();
         alert('API 網址設定完成！');
+        fetchClassList();
       }
+    }
+
+    // 取得雲端試算表所有分頁名稱
+    async function fetchClassList() {
+      if (!state.apiUrl) {
+        loadFallbackClasses();
+        return;
+      }
+
+      updateSyncStatus('syncing', '● 取得班級中...');
+
+      try {
+        const res = await fetch(`${state.apiUrl}?action=getSheets`);
+        const json = await res.json();
+
+        if (json.status === 'success' && json.sheets && json.sheets.length > 0) {
+          state.classList = json.sheets;
+          localStorage.setItem('cache_sheets', JSON.stringify(state.classList));
+          renderClassSelector(state.classList);
+          updateSyncStatus('online', '● 已連線');
+        } else {
+          loadFallbackClasses();
+        }
+      } catch (e) {
+        loadFallbackClasses();
+      }
+    }
+
+    // 離線情況下使用的預設班級 (A, B, C, D, E)
+    function loadFallbackClasses() {
+      const cachedSheets = localStorage.getItem('cache_sheets');
+      if (cachedSheets) {
+        state.classList = JSON.parse(cachedSheets);
+        renderClassSelector(state.classList);
+        updateSyncStatus('offline', '● 離線模式 (使用快取班級)');
+      } else {
+        state.classList = ['A班', 'B班', 'C班', 'D班', 'E班'];
+        renderClassSelector(state.classList);
+        updateSyncStatus('offline', '● 離線模式 (僅限離線使用預設班級)');
+      }
+    }
+
+    // 渲染分頁選單按鈕
+    function renderClassSelector(classes) {
+      const grid = document.getElementById('classSelectorGrid');
+      grid.innerHTML = '';
+
+      classes.forEach((cls, index) => {
+        const card = document.createElement('div');
+        card.className = 'card-btn';
+        if (classes.length % 2 !== 0 && index === classes.length - 1) {
+          card.style.gridColumn = 'span 2';
+        }
+        card.innerHTML = `
+          <div class="title">${cls}</div>
+          <div class="subtitle">點擊進入</div>
+        `;
+        card.onclick = () => selectClass(cls);
+        grid.appendChild(card);
+      });
     }
 
     function goToStep(stepNum) {
