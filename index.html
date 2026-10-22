@@ -454,8 +454,10 @@
       border-radius: var(--radius);
       padding: 20px;
       width: 90%;
-      max-width: 450px;
+      max-width: 480px;
       margin: auto;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     .config-modal input {
@@ -463,7 +465,27 @@
       padding: 10px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      margin: 12px 0 16px;
+      margin: 8px 0 16px;
+    }
+
+    .help-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .help-box ol {
+      padding-left: 20px;
+      margin-top: 6px;
+    }
+
+    .help-box li {
+      margin-bottom: 4px;
     }
 
     .empty-state {
@@ -631,11 +653,27 @@
     </div>
   </div>
 
-  <!-- API URL 設定彈窗 -->
+  <!-- API URL 設定彈窗 (含 ❓ 教學按鈕) -->
   <div class="modal-overlay" id="configModal">
     <div class="config-modal">
-      <h2 style="font-size: 1.1rem; margin-bottom: 8px;">⚙️ Google Apps Script 設定</h2>
-      <p style="font-size: 0.8rem; color: var(--text-muted);">請輸入部署的 Web App URL：</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h2 style="font-size: 1.1rem;">⚙️ Google Apps Script 設定</h2>
+        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="toggleHelp()">❓ 教學</button>
+      </div>
+
+      <!-- 教學折疊區 -->
+      <div class="help-box" id="helpBox" style="display: none;">
+        <strong>💡 如何建立自己的試算表並取得 URL？</strong>
+        <ol>
+          <li>建立自己的 <b>Google 試算表</b>，建立分頁：<code>A班</code>、<code>B班</code>、<code>C班</code>、<code>D班</code>、<code>E班</code>。</li>
+          <li>點擊上方選單 <b>「擴充功能」>「Apps Script」</b>。</li>
+          <li>貼上對應的後端程式碼並點擊右上角 <b>「部署」>「新增部署作業」</b>。</li>
+          <li>類型選擇 <b>「網頁應用程式」</b>，存取權選 <b>「所有人」</b>。</li>
+          <li>複製產生的 <b>網頁應用程式 URL (網址)</b>，貼到下方輸入框中即可！</li>
+        </ol>
+      </div>
+
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">請輸入部署的 Web App URL：</p>
       <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeConfigModal()">取消</button>
@@ -682,7 +720,6 @@
         document.getElementById('configModal').classList.add('open');
       });
 
-      // 立定跳遠客製化選單: 不合格, 80, 85, 90, 95, 100~250
       state.customJumpOptions = ['不合格', 80, 85, 90, 95];
       for (let i = 100; i <= 250; i++) {
         state.customJumpOptions.push(i);
@@ -690,6 +727,11 @@
 
       setupWheelTouch('intWheelCol', 'intScroll', true);
       setupWheelTouch('decWheelCol', 'decScroll', false);
+    }
+
+    function toggleHelp() {
+      const box = document.getElementById('helpBox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
     }
 
     function closeConfigModal() {
@@ -729,7 +771,6 @@
       if (localCache) {
         state.rawData = JSON.parse(localCache);
       } else {
-        // 預設生成 35 位學生骨架，防止無網路時打不開
         state.rawData = [["學號", "姓名", "身高", "體重", "手握力", "折返跑", "立定跳遠", "眼鏡", "出生年份"]];
         for (let i = 1; i <= 35; i++) {
           state.rawData.push([i, ``, "", "", "", "", "", "", ""]);
@@ -787,7 +828,7 @@
 
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
-        const num = row[0] || i; // 只取學號
+        const num = row[0] || i;
         const val = row[state.currentField];
         const hasVal = val !== undefined && val !== '';
 
@@ -1067,14 +1108,10 @@
       }
 
       state.rawData[state.activeStudentIndex][state.currentField] = finalVal;
-
-      // 1. 強制優先寫入本機備份防錯 (LocalStorage)
       localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
 
       renderStudentList();
       closePicker();
-
-      // 2. 背景同步上傳 Google Sheets
       autoUpload();
     }
 
@@ -1086,14 +1123,13 @@
       autoUpload();
     }
 
-    // 防錯功能：本機下載 Excel CSV 備份檔
     function exportToExcel() {
       if (!state.rawData || state.rawData.length === 0) {
         alert('尚無數據可供匯出！');
         return;
       }
 
-      let csvContent = "\uFEFF"; // UTF-8 BOM，避免 Excel 開啟中文亂碼
+      let csvContent = "\uFEFF";
       state.rawData.forEach(row => {
         csvContent += row.join(",") + "\n";
       });
