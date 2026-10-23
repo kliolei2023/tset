@@ -245,6 +245,12 @@
       justify-content: center;
     }
 
+    .student-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
     .student-value {
       font-size: 1.1rem;
       font-weight: 700;
@@ -875,6 +881,7 @@
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
         const num = row[0] || i;
+        const name = row[1] || ''; // 取得學生姓名
         const val = row[state.currentField];
         const hasVal = val !== undefined && val !== '';
 
@@ -891,9 +898,11 @@
           }
         }
 
+        // 渲染學號、姓名與填寫數值
         card.innerHTML = `
           <div class="student-info">
             <div class="student-no">${num}</div>
+            <div class="student-name">${name}</div>
           </div>
           <div class="student-value ${hasVal ? 'filled' : ''}">
             ${displayVal}
@@ -906,7 +915,8 @@
 
     function openPicker(rowIndex, studentNo, currentVal) {
       state.activeStudentIndex = rowIndex;
-      document.getElementById('pStudentName').textContent = `學號：${studentNo} 號`;
+      const studentName = state.rawData[rowIndex][1] || '';
+      document.getElementById('pStudentName').textContent = `學號：${studentNo} 號 ${studentName ? '(' + studentName + ')' : ''}`;
       document.getElementById('pItemName').textContent = `項目：${state.fieldName} ${state.fieldUnit ? '(' + state.fieldUnit + ')' : ''}`;
 
       if (state.inputType === 'toggle') {
