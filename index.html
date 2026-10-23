@@ -334,7 +334,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .picker-title {
@@ -347,12 +347,40 @@
       color: var(--text-muted);
     }
 
+    /* 模式切換按鈕 */
+    .mode-switch-group {
+      display: flex;
+      background: var(--bg);
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      gap: 4px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-tab.active {
+      background: #fff;
+      color: var(--primary);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+
     .value-display {
       text-align: center;
-      padding: 12px 0;
+      padding: 10px 0;
       background: var(--bg);
       border-radius: var(--radius);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .value-display .num {
@@ -369,7 +397,7 @@
       justify-content: center;
       align-items: center;
       overflow: hidden;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       background: #fafafa;
       border-radius: 16px;
     }
@@ -426,10 +454,43 @@
       font-weight: 800;
     }
 
+    /* 大數字計算機 Keypad 樣式 */
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .key-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 0;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .key-btn:active {
+      background: var(--primary-light);
+      color: var(--primary);
+      transform: scale(0.95);
+    }
+
+    .key-btn.action-btn {
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
     .toggle-options {
       display: flex;
       gap: 12px;
-      margin: 30px 0;
+      margin: 20px 0;
     }
 
     .toggle-btn {
@@ -516,7 +577,7 @@
   </div>
 
   <div class="container">
-    <!-- 步驟 1：動態載入分頁名稱（離線時使用預設 A~E 班） -->
+    <!-- 步驟 1：動態載入分頁名稱 -->
     <div class="step-page active" id="step1">
       <div class="section-title">請選擇班別</div>
       <div class="grid-selector" id="classSelectorGrid">
@@ -597,7 +658,7 @@
     </div>
   </div>
 
-  <!-- iOS Wheel Picker 數據錄入彈窗 -->
+  <!-- iOS Wheel Picker & 大數字計算機 錄入彈窗 -->
   <div class="modal-overlay" id="pickerModal">
     <div class="picker-modal">
       <div class="picker-header">
@@ -608,26 +669,44 @@
         <button class="icon-btn" onclick="closePicker()">✕</button>
       </div>
 
+      <!-- 模式切換按鈕 (計算機 vs 滾輪) -->
+      <div class="mode-switch-group" id="inputModeSwitch">
+        <div class="mode-tab active" id="tabKeypad" onclick="switchInputMode('keypad')">🔢 大數字計算機</div>
+        <div class="mode-tab" id="tabWheel" onclick="switchInputMode('wheel')">🎡 iPhone 滾輪</div>
+      </div>
+
       <div class="value-display">
         <div class="num" id="currentValDisplay">135.0</div>
       </div>
 
-      <!-- 滾輪選擇區器 -->
-      <div class="wheel-wrapper" id="wheelContainer">
+      <!-- 1. iOS 滾輪選擇區 -->
+      <div class="wheel-wrapper" id="wheelContainer" style="display: none;">
         <div class="wheel-highlight"></div>
-
-        <!-- 整數滾輪 -->
         <div class="wheel-column" id="intWheelCol">
           <div class="wheel-scroll" id="intScroll"></div>
         </div>
-
-        <!-- 小數點滾輪 (可選) -->
         <div class="wheel-column" id="decWheelCol">
           <div class="wheel-scroll" id="decScroll"></div>
         </div>
       </div>
 
-      <!-- 眼鏡開關切換 (僅眼鏡項目顯示) -->
+      <!-- 2. 大數字計算機 Keypad 區域 -->
+      <div class="keypad-grid" id="keypadContainer">
+        <div class="key-btn" onclick="pressKey('7')">7</div>
+        <div class="key-btn" onclick="pressKey('8')">8</div>
+        <div class="key-btn" onclick="pressKey('9')">9</div>
+        <div class="key-btn" onclick="pressKey('4')">4</div>
+        <div class="key-btn" onclick="pressKey('5')">5</div>
+        <div class="key-btn" onclick="pressKey('6')">6</div>
+        <div class="key-btn" onclick="pressKey('1')">1</div>
+        <div class="key-btn" onclick="pressKey('2')">2</div>
+        <div class="key-btn" onclick="pressKey('3')">3</div>
+        <div class="key-btn action-btn" onclick="pressKey('.')">.</div>
+        <div class="key-btn" onclick="pressKey('0')">0</div>
+        <div class="key-btn action-btn" onclick="pressKey('backspace')">⌫</div>
+      </div>
+
+      <!-- 3. 眼鏡開關切換 (僅眼鏡項目顯示) -->
       <div class="toggle-options" id="toggleContainer" style="display: none;">
         <div class="toggle-btn" id="btnOptNo" onclick="selectToggleVal('無')">無 (沒戴眼鏡)</div>
         <div class="toggle-btn" id="btnOptYes" onclick="selectToggleVal('有')">有 (有戴眼鏡)</div>
@@ -640,7 +719,7 @@
     </div>
   </div>
 
-  <!-- API URL 設定彈窗 (含 ❓ 教學按鈕) -->
+  <!-- API URL 設定彈窗 -->
   <div class="modal-overlay" id="configModal">
     <div class="config-modal">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -648,7 +727,6 @@
         <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="toggleHelp()">❓ 教學</button>
       </div>
 
-      <!-- 教學折疊區 -->
       <div class="help-box" id="helpBox" style="display: none;">
         <strong>💡 如何建立自己的試算表並取得 URL？</strong>
         <ol>
@@ -674,6 +752,7 @@
 
     let state = {
       apiUrl: localStorage.getItem('gas_api_url') || DEFAULT_API_URL,
+      inputMode: localStorage.getItem('preferred_input_mode') || 'keypad', // keypad 或 wheel
       classList: [],
       currentClass: '',
       currentField: 2,
@@ -689,7 +768,8 @@
       tempInt: 0,
       tempDec: 0,
       tempToggle: '無',
-      tempCustomIndex: 0
+      tempCustomIndex: 0,
+      keypadValueStr: '' // 計算機模式暫存的字串
     };
 
     const ITEM_HEIGHT = 40;
@@ -716,7 +796,6 @@
       setupWheelTouch('intWheelCol', 'intScroll', true);
       setupWheelTouch('decWheelCol', 'decScroll', false);
 
-      // 初始化時取得雲端分頁名稱
       fetchClassList();
     }
 
@@ -740,7 +819,6 @@
       }
     }
 
-    // 取得雲端試算表所有分頁名稱
     async function fetchClassList() {
       if (!state.apiUrl) {
         loadFallbackClasses();
@@ -766,7 +844,6 @@
       }
     }
 
-    // 離線情況下使用的預設班級 (A, B, C, D, E)
     function loadFallbackClasses() {
       const cachedSheets = localStorage.getItem('cache_sheets');
       if (cachedSheets) {
@@ -780,7 +857,6 @@
       }
     }
 
-    // 渲染分頁選單按鈕
     function renderClassSelector(classes) {
       const grid = document.getElementById('classSelectorGrid');
       grid.innerHTML = '';
@@ -881,7 +957,7 @@
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
         const num = row[0] || i;
-        const name = row[1] || ''; // 取得學生姓名
+        const name = row[1] || '';
         const val = row[state.currentField];
         const hasVal = val !== undefined && val !== '';
 
@@ -898,7 +974,6 @@
           }
         }
 
-        // 渲染學號、姓名與填寫數值
         card.innerHTML = `
           <div class="student-info">
             <div class="student-no">${num}</div>
@@ -913,6 +988,7 @@
       }
     }
 
+    // 打開輸入面板
     function openPicker(rowIndex, studentNo, currentVal) {
       state.activeStudentIndex = rowIndex;
       const studentName = state.rawData[rowIndex][1] || '';
@@ -920,44 +996,80 @@
       document.getElementById('pItemName').textContent = `項目：${state.fieldName} ${state.fieldUnit ? '(' + state.fieldUnit + ')' : ''}`;
 
       if (state.inputType === 'toggle') {
+        document.getElementById('inputModeSwitch').style.display = 'none';
         document.getElementById('wheelContainer').style.display = 'none';
+        document.getElementById('keypadContainer').style.display = 'none';
         document.getElementById('toggleContainer').style.display = 'flex';
         document.getElementById('currentValDisplay').textContent = currentVal || '未設定';
         selectToggleVal(currentVal === '有' ? '有' : '無');
-      } else if (state.inputType === 'customJump') {
-        document.getElementById('wheelContainer').style.display = 'flex';
-        document.getElementById('toggleContainer').style.display = 'none';
-        document.getElementById('decWheelCol').style.display = 'none';
-
-        let idx = 0;
-        if (currentVal === '不合格') {
-          idx = 0;
-        } else if (currentVal !== undefined && currentVal !== '') {
-          const num = parseInt(currentVal);
-          const foundIdx = state.customJumpOptions.indexOf(num);
-          if (foundIdx !== -1) idx = foundIdx;
-        }
-
-        state.tempCustomIndex = idx;
-        buildCustomJumpItems();
-        scrollToCustomIndex(idx);
-        updateDisplayVal();
       } else {
-        document.getElementById('wheelContainer').style.display = 'flex';
+        document.getElementById('inputModeSwitch').style.display = 'flex';
         document.getElementById('toggleContainer').style.display = 'none';
 
+        // 初始化計算機與滾輪數值
+        state.keypadValueStr = currentVal !== undefined && currentVal !== '' ? String(currentVal) : '';
+        
         let numVal = parseFloat(currentVal);
         if (isNaN(numVal)) numVal = state.minVal || 0;
-
         state.tempInt = Math.floor(numVal);
         state.tempDec = Math.round((numVal - state.tempInt) * 10);
 
-        buildWheelItems();
-        scrollToValue(state.tempInt, state.tempDec);
-        updateDisplayVal();
+        if (state.inputType === 'customJump') {
+          let idx = 0;
+          if (currentVal === '不合格') {
+            idx = 0;
+          } else if (currentVal !== undefined && currentVal !== '') {
+            const num = parseInt(currentVal);
+            const foundIdx = state.customJumpOptions.indexOf(num);
+            if (foundIdx !== -1) idx = foundIdx;
+          }
+          state.tempCustomIndex = idx;
+          buildCustomJumpItems();
+          scrollToCustomIndex(idx);
+        } else {
+          buildWheelItems();
+          scrollToValue(state.tempInt, state.tempDec);
+        }
+
+        switchInputMode(state.inputMode);
       }
 
       pickerModal.classList.add('open');
+    }
+
+    // 切換「計算機」與「滾輪」輸入模式
+    function switchInputMode(mode) {
+      state.inputMode = mode;
+      localStorage.setItem('preferred_input_mode', mode);
+
+      document.getElementById('tabKeypad').classList.toggle('active', mode === 'keypad');
+      document.getElementById('tabWheel').classList.toggle('active', mode === 'wheel');
+
+      if (mode === 'keypad') {
+        document.getElementById('keypadContainer').style.display = 'grid';
+        document.getElementById('wheelContainer').style.display = 'none';
+      } else {
+        document.getElementById('keypadContainer').style.display = 'none';
+        document.getElementById('wheelContainer').style.display = 'flex';
+      }
+
+      updateDisplayVal();
+    }
+
+    // 計算機按鈕點擊處理
+    function pressKey(key) {
+      if (key === 'backspace') {
+        state.keypadValueStr = state.keypadValueStr.slice(0, -1);
+      } else if (key === '.') {
+        if (!state.hasDecimal) return; // 不允許小數點
+        if (!state.keypadValueStr.includes('.')) {
+          state.keypadValueStr += state.keypadValueStr === '' ? '0.' : '.';
+        }
+      } else {
+        // 數字鍵
+        state.keypadValueStr += key;
+      }
+      updateDisplayVal();
     }
 
     function closePicker() {
@@ -1132,17 +1244,26 @@
     }
 
     function updateDisplayVal() {
+      const displayElem = document.getElementById('currentValDisplay');
+
       if (state.inputType === 'customJump') {
         const val = state.customJumpOptions[state.tempCustomIndex];
-        if (val === '不合格') {
-          document.getElementById('currentValDisplay').textContent = '不合格';
+        displayElem.textContent = val === '不合格' ? '不合格' : `${val} cm`;
+        return;
+      }
+
+      if (state.inputMode === 'keypad') {
+        if (state.keypadValueStr === '') {
+          displayElem.textContent = `請按鍵輸入 (${state.fieldUnit})`;
         } else {
-          document.getElementById('currentValDisplay').textContent = `${val} cm`;
+          displayElem.textContent = `${state.keypadValueStr} ${state.fieldUnit}`;
         }
-      } else if (state.hasDecimal) {
-        document.getElementById('currentValDisplay').textContent = `${state.tempInt}.${state.tempDec} ${state.fieldUnit}`;
       } else {
-        document.getElementById('currentValDisplay').textContent = `${state.tempInt} ${state.fieldUnit}`;
+        if (state.hasDecimal) {
+          displayElem.textContent = `${state.tempInt}.${state.tempDec} ${state.fieldUnit}`;
+        } else {
+          displayElem.textContent = `${state.tempInt} ${state.fieldUnit}`;
+        }
       }
     }
 
@@ -1155,10 +1276,13 @@
 
     function confirmAndSave() {
       let finalVal = '';
+
       if (state.inputType === 'toggle') {
         finalVal = state.tempToggle;
       } else if (state.inputType === 'customJump') {
         finalVal = state.customJumpOptions[state.tempCustomIndex];
+      } else if (state.inputMode === 'keypad') {
+        finalVal = state.keypadValueStr !== '' ? parseFloat(state.keypadValueStr) : '';
       } else {
         finalVal = state.hasDecimal ? parseFloat(`${state.tempInt}.${state.tempDec}`) : state.tempInt;
       }
@@ -1173,6 +1297,7 @@
 
     function clearCurrentData() {
       state.rawData[state.activeStudentIndex][state.currentField] = '';
+      state.keypadValueStr = '';
       localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
       renderStudentList();
       closePicker();
