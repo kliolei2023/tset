@@ -347,7 +347,6 @@
       color: var(--text-muted);
     }
 
-    /* 模式切換按鈕 */
     .mode-switch-group {
       display: flex;
       background: var(--bg);
@@ -389,7 +388,6 @@
       color: var(--primary);
     }
 
-    /* iOS Wheel Picker Container */
     .wheel-wrapper {
       position: relative;
       height: 200px;
@@ -454,7 +452,6 @@
       font-weight: 800;
     }
 
-    /* 大數字計算機 Keypad 樣式 */
     .keypad-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -485,6 +482,31 @@
       background: #f1f5f9;
       color: var(--text-muted);
       font-size: 1.1rem;
+    }
+
+    /* 立定跳遠專用快速按鈕列 */
+    .jump-quick-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .jump-quick-btn {
+      flex: 1;
+      padding: 10px 4px;
+      background: var(--primary-light);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .jump-quick-btn:active {
+      background: var(--primary);
+      color: white;
     }
 
     .toggle-options {
@@ -679,6 +701,14 @@
         <div class="num" id="currentValDisplay">135.0</div>
       </div>
 
+      <!-- 立定跳遠專用快捷按鈕列 -->
+      <div class="jump-quick-bar" id="jumpQuickBar" style="display: none;">
+        <div class="jump-quick-btn" onclick="selectJumpQuick('不合格')">❌ 不合格</div>
+        <div class="jump-quick-btn" onclick="selectJumpQuick(80)">80 cm</div>
+        <div class="jump-quick-btn" onclick="selectJumpQuick(90)">90 cm</div>
+        <div class="jump-quick-btn" onclick="selectJumpQuick(100)">100 cm</div>
+      </div>
+
       <!-- 1. iOS 滾輪選擇區 -->
       <div class="wheel-wrapper" id="wheelContainer" style="display: none;">
         <div class="wheel-highlight"></div>
@@ -706,7 +736,7 @@
         <div class="key-btn action-btn" onclick="pressKey('backspace')">⌫</div>
       </div>
 
-      <!-- 3. 眼鏡開關切換 (僅眼鏡項目顯示) -->
+      <!-- 3. 眼鏡開關切換 -->
       <div class="toggle-options" id="toggleContainer" style="display: none;">
         <div class="toggle-btn" id="btnOptNo" onclick="selectToggleVal('無')">無 (沒戴眼鏡)</div>
         <div class="toggle-btn" id="btnOptYes" onclick="selectToggleVal('有')">有 (有戴眼鏡)</div>
@@ -752,7 +782,7 @@
 
     let state = {
       apiUrl: localStorage.getItem('gas_api_url') || DEFAULT_API_URL,
-      inputMode: localStorage.getItem('preferred_input_mode') || 'keypad', // keypad 或 wheel
+      inputMode: localStorage.getItem('preferred_input_mode') || 'keypad',
       classList: [],
       currentClass: '',
       currentField: 2,
@@ -769,7 +799,8 @@
       tempDec: 0,
       tempToggle: '無',
       tempCustomIndex: 0,
-      keypadValueStr: '' // 計算機模式暫存的字串
+      keypadValueStr: '',
+      jumpSelectedValue: '' // 專門儲存立定跳遠選擇的值 (數字或 '不合格')
     };
 
     const ITEM_HEIGHT = 40;
@@ -995,20 +1026,29 @@
       document.getElementById('pStudentName').textContent = `學號：${studentNo} 號 ${studentName ? '(' + studentName + ')' : ''}`;
       document.getElementById('pItemName').textContent = `項目：${state.fieldName} ${state.fieldUnit ? '(' + state.fieldUnit + ')' : ''}`;
 
+      const jumpBar = document.getElementById('jumpQuickBar');
+      const modeSwitch = document.getElementById('inputModeSwitch');
+
       if (state.inputType === 'toggle') {
-        document.getElementById('inputModeSwitch').style.display = 'none';
+        modeSwitch.style.display = 'none';
+        jumpBar.style.display = 'none';
         document.getElementById('wheelContainer').style.display = 'none';
         document.getElementById('keypadContainer').style.display = 'none';
         document.getElementById('toggleContainer').style.display = 'flex';
         document.getElementById('currentValDisplay').textContent = currentVal || '未設定';
         selectToggleVal(currentVal === '有' ? '有' : '無');
       } else {
-        document.getElementById('inputModeSwitch').style.display = 'flex';
+        modeSwitch.style.display = 'flex';
         document.getElementById('toggleContainer').style.display = 'none';
 
-        // 初始化計算機與滾輪數值
-        state.keypadValueStr = currentVal !== undefined && currentVal !== '' ? String(currentVal) : '';
-        
+        if (state.inputType === 'customJump') {
+          jumpBar.style.display = 'flex';
+          state.jumpSelectedValue = currentVal !== undefined && currentVal !== '' ? currentVal : 80;
+        } else {
+          jumpBar.style.display = 'none';
+          state.keypadValueStr = currentVal !== undefined && currentVal !== '' ? String(currentVal) : '';
+        }
+
         let numVal = parseFloat(currentVal);
         if (isNaN(numVal)) numVal = state.minVal || 0;
         state.tempInt = Math.floor(numVal);
@@ -1037,7 +1077,7 @@
       pickerModal.classList.add('open');
     }
 
-    // 切換「計算機」與「滾輪」輸入模式
+    // 切換輸入模式
     function switchInputMode(mode) {
       state.inputMode = mode;
       localStorage.setItem('preferred_input_mode', mode);
@@ -1056,19 +1096,38 @@
       updateDisplayVal();
     }
 
-    // 計算機按鈕點擊處理
+    // 計算機按鍵點擊處理
     function pressKey(key) {
-      if (key === 'backspace') {
-        state.keypadValueStr = state.keypadValueStr.slice(0, -1);
-      } else if (key === '.') {
-        if (!state.hasDecimal) return; // 不允許小數點
-        if (!state.keypadValueStr.includes('.')) {
-          state.keypadValueStr += state.keypadValueStr === '' ? '0.' : '.';
+      if (state.inputType === 'customJump') {
+        // 立定跳遠在計算機模式下可直接當數字輸入
+        if (key === 'backspace') {
+          state.jumpSelectedValue = String(state.jumpSelectedValue).slice(0, -1);
+        } else if (key === '.') {
+          if (!String(state.jumpSelectedValue).includes('.')) {
+            state.jumpSelectedValue += state.jumpSelectedValue === '' ? '0.' : '.';
+          }
+        } else {
+          if (state.jumpSelectedValue === '不合格') state.jumpSelectedValue = '';
+          state.jumpSelectedValue += key;
         }
       } else {
-        // 數字鍵
-        state.keypadValueStr += key;
+        if (key === 'backspace') {
+          state.keypadValueStr = state.keypadValueStr.slice(0, -1);
+        } else if (key === '.') {
+          if (!state.hasDecimal) return;
+          if (!state.keypadValueStr.includes('.')) {
+            state.keypadValueStr += state.keypadValueStr === '' ? '0.' : '.';
+          }
+        } else {
+          state.keypadValueStr += key;
+        }
       }
+      updateDisplayVal();
+    }
+
+    // 立定跳遠快捷按鈕點擊
+    function selectJumpQuick(val) {
+      state.jumpSelectedValue = val;
       updateDisplayVal();
     }
 
@@ -1204,6 +1263,7 @@
 
         if (state.inputType === 'customJump') {
           state.tempCustomIndex = index;
+          state.jumpSelectedValue = state.customJumpOptions[index];
         } else if (isInt) {
           state.tempInt = state.minVal + index;
         } else {
@@ -1247,8 +1307,12 @@
       const displayElem = document.getElementById('currentValDisplay');
 
       if (state.inputType === 'customJump') {
-        const val = state.customJumpOptions[state.tempCustomIndex];
-        displayElem.textContent = val === '不合格' ? '不合格' : `${val} cm`;
+        if (state.inputMode === 'keypad') {
+          displayElem.textContent = state.jumpSelectedValue === '' ? '請輸入或選下方快捷' : (state.jumpSelectedValue === '不合格' ? '不合格' : `${state.jumpSelectedValue} cm`);
+        } else {
+          const val = state.customJumpOptions[state.tempCustomIndex];
+          displayElem.textContent = val === '不合格' ? '不合格' : `${val} cm`;
+        }
         return;
       }
 
@@ -1280,7 +1344,11 @@
       if (state.inputType === 'toggle') {
         finalVal = state.tempToggle;
       } else if (state.inputType === 'customJump') {
-        finalVal = state.customJumpOptions[state.tempCustomIndex];
+        if (state.inputMode === 'keypad') {
+          finalVal = state.jumpSelectedValue === '不合格' ? '不合格' : (state.jumpSelectedValue !== '' ? parseFloat(state.jumpSelectedValue) : '');
+        } else {
+          finalVal = state.customJumpOptions[state.tempCustomIndex];
+        }
       } else if (state.inputMode === 'keypad') {
         finalVal = state.keypadValueStr !== '' ? parseFloat(state.keypadValueStr) : '';
       } else {
@@ -1298,6 +1366,7 @@
     function clearCurrentData() {
       state.rawData[state.activeStudentIndex][state.currentField] = '';
       state.keypadValueStr = '';
+      state.jumpSelectedValue = '';
       localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
       renderStudentList();
       closePicker();
