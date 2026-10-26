@@ -298,7 +298,7 @@
     .btn-secondary { background: #e2e8f0; color: #334155; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-excel { background: #10b981; color: white; }
-    .btn-add-col { background: #8b5cf6; color: white; margin-bottom: 12px; }
+    .btn-add-col { background: #8b5cf6; color: white; }
 
     /* Modal iOS Picker */
     .modal-overlay {
@@ -499,7 +499,6 @@
       font-size: 1.1rem;
     }
 
-    /* 立定跳遠專用快速按鈕列 */
     .jump-quick-bar {
       display: flex;
       gap: 8px;
@@ -572,17 +571,6 @@
       margin: 8px 0 16px;
     }
 
-    .help-box {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      margin-bottom: 16px;
-      font-size: 0.85rem;
-      line-height: 1.5;
-      text-align: left;
-    }
-
     .empty-state {
       text-align: center;
       padding: 40px 20px;
@@ -613,14 +601,12 @@
       </div>
     </div>
 
-    <!-- 步驟 2：選擇項目 (支援動態載入多輪測量欄位) -->
+    <!-- 步驟 2：選擇項目 -->
     <div class="step-page" id="step2">
       <div class="section-title">
         <span>請選擇測量項目</span>
       </div>
-      <div class="item-grid" id="itemGridContainer">
-        <!-- 動態渲染項目列表 -->
-      </div>
+      <div class="item-grid" id="itemGridContainer"></div>
       <div class="nav-buttons">
         <button class="btn btn-secondary" onclick="goToStep(1)">⬅️ 重選班別</button>
       </div>
@@ -628,11 +614,18 @@
 
     <!-- 步驟 3：學生名單與資料點擊輸入 -->
     <div class="step-page" id="step3">
-      <div class="section-title">
-        <span id="studentListTitle">學生列表</span>
-        <button class="btn btn-add-col" style="padding: 6px 12px; font-size: 0.8rem; margin:0;" onclick="addNewMeasurementColumn()">➕ 開啟下一次測量欄位</button>
+      <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">切換測量欄位 (檢視/修改)：</span>
+          <select id="columnSwitcherSelect" onchange="switchColumnBySelect(this.value)" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.9rem; font-weight: bold; color: var(--primary); background: var(--bg);"></select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-add-col" style="flex:1; padding: 8px; font-size: 0.85rem;" onclick="addNewMeasurementColumn()">➕ 開啟下一次測量欄位</button>
+        </div>
       </div>
+
       <div class="student-list" id="studentList"></div>
+      
       <div class="nav-buttons">
         <button class="btn btn-excel" onclick="exportToExcel()">📥 匯出當前班級 Excel (.csv)</button>
         <div class="button-group">
@@ -659,17 +652,17 @@
         <canvas id="studentTrendChart"></canvas>
       </div>
 
-      <!-- 模式切換按鈕 (計算機 vs 滾輪) -->
+      <!-- 模式切換按鈕 -->
       <div class="mode-switch-group" id="inputModeSwitch">
         <div class="mode-tab active" id="tabKeypad" onclick="switchInputMode('keypad')">🔢 大數字計算機</div>
         <div class="mode-tab" id="tabWheel" onclick="switchInputMode('wheel')">🎡 iPhone 滾輪</div>
       </div>
 
       <div class="value-display">
-        <div class="num" id="currentValDisplay">135.0</div>
+        <div class="num" id="currentValDisplay">-</div>
       </div>
 
-      <!-- 立定跳遠專用快捷按鈕列 -->
+      <!-- 快捷按鈕列 -->
       <div class="jump-quick-bar" id="jumpQuickBar" style="display: none;">
         <div class="jump-quick-btn" onclick="selectJumpQuick('不合格')">❌ 不合格</div>
         <div class="jump-quick-btn" onclick="selectJumpQuick(80)">80 cm</div>
@@ -720,7 +713,7 @@
   <!-- API URL 設定彈窗 -->
   <div class="modal-overlay" id="configModal">
     <div class="config-modal">
-      <div style="display: flex; justify-content: space-between; align- items: center; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <h2 style="font-size: 1.1rem;">⚙️ Google Apps Script 設定</h2>
       </div>
       <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">請輸入部署的 Web App URL：</p>
@@ -735,7 +728,6 @@
   <script>
     const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbzQjRhPxTOTOPYK352YFFMfN1n6xRtxZgwtMYlzgnu_9O4FAFEtmNC2QENb9ZevnBY/exec";
 
-    // 基礎預設項目範本
     const BASE_ITEMS_CONFIG = [
       { name: '身高', unit: 'cm', min: 100, max: 200, hasDec: true, icon: '📏' },
       { name: '體重', unit: 'kg', min: 10, max: 120, hasDec: true, icon: '⚖️' },
@@ -753,7 +745,7 @@
       currentClass: '',
       currentField: 2,
       fieldName: '',
-      fieldBaseName: '', // 基礎名稱如 "立定跳遠"
+      fieldBaseName: '', 
       fieldUnit: '',
       hasDecimal: true,
       minVal: 0,
@@ -888,19 +880,15 @@
       fetchData();
     }
 
-    // 動態解析試算表標頭，生成項目按鈕 (自動包含 第2, 3, 4 次項目)
     function renderItemGrid() {
       const container = document.getElementById('itemGridContainer');
       container.innerHTML = '';
 
       const headers = state.rawData[0] || [];
-
-      // 從欄位索引 2 開始 (0:學號, 1:姓名)
       for (let colIdx = 2; colIdx < headers.length; colIdx++) {
         const headerName = headers[colIdx];
         if (!headerName) continue;
 
-        // 匹配基礎項目類別
         let matchConfig = BASE_ITEMS_CONFIG.find(item => headerName.startsWith(item.name)) || {
           name: headerName, unit: '', min: 0, max: 200, hasDec: true, icon: '🎯', type: 'number'
         };
@@ -929,17 +917,57 @@
       state.hasDecimal = config.hasDec;
       state.inputType = config.type || 'number';
 
-      document.getElementById('studentListTitle').textContent = `${state.currentClass} - ${state.fieldName}`;
       goToStep(3);
+      updateColumnSwitcherOptions();
       renderStudentList();
     }
 
-    // 自動新增「第 2, 3, 4 次」測量欄位
+    function updateColumnSwitcherOptions() {
+      const selectElem = document.getElementById('columnSwitcherSelect');
+      selectElem.innerHTML = '';
+
+      const headers = state.rawData[0] || [];
+      const baseName = state.fieldBaseName;
+
+      headers.forEach((h, colIdx) => {
+        if (h && h.startsWith(baseName)) {
+          const option = document.createElement('option');
+          option.value = colIdx;
+          option.textContent = h;
+          if (colIdx === state.currentField) {
+            option.selected = true;
+          }
+          selectElem.appendChild(option);
+        }
+      });
+    }
+
+    function switchColumnBySelect(colIdx) {
+      colIdx = parseInt(colIdx);
+      const headers = state.rawData[0];
+      const fullName = headers[colIdx];
+
+      let matchConfig = BASE_ITEMS_CONFIG.find(item => fullName.startsWith(item.name)) || {
+        name: fullName, unit: '', min: 0, max: 200, hasDec: true, type: 'number'
+      };
+
+      state.currentField = colIdx;
+      state.fieldName = fullName;
+      state.fieldBaseName = matchConfig.name;
+      state.fieldUnit = matchConfig.unit;
+      state.minVal = matchConfig.min;
+      state.maxVal = matchConfig.max;
+      state.hasDecimal = matchConfig.hasDec;
+      state.inputType = matchConfig.type || 'number';
+
+      breadcrumb.innerHTML = `<span onclick="goToStep(1)">${state.currentClass}</span> ➔ <span onclick="goToStep(2)">${state.fieldName}</span> ➔ <span class="active">登錄數據</span>`;
+      renderStudentList();
+    }
+
     function addNewMeasurementColumn() {
       const headers = state.rawData[0];
       const baseName = state.fieldBaseName;
 
-      // 計算目前已經有幾次該項目
       let count = 0;
       headers.forEach(h => {
         if (h && h.startsWith(baseName)) count++;
@@ -948,7 +976,6 @@
       const nextColName = `${baseName} ${count + 1}`;
       if (!confirm(`確定要為【${state.currentClass}】自動新增「${nextColName}」欄位嗎？`)) return;
 
-      // 在標頭追加新欄位
       state.rawData[0].push(nextColName);
       for (let i = 1; i < state.rawData.length; i++) {
         state.rawData[i].push("");
@@ -959,7 +986,6 @@
       autoUpload();
       renderItemGrid();
       
-      // 自動切換至新開啟的欄位
       const newColIndex = state.rawData[0].length - 1;
       const baseConfig = BASE_ITEMS_CONFIG.find(item => item.name === baseName) || {};
       selectItem(newColIndex, nextColName, baseConfig);
@@ -976,7 +1002,10 @@
           localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
           updateSyncStatus('online', '● 已同步');
           renderItemGrid();
-          if (step3.classList.contains('active')) renderStudentList();
+          if (step3.classList.contains('active')) {
+            updateColumnSwitcherOptions();
+            renderStudentList();
+          }
         } else {
           updateSyncStatus('offline', '● 離線模式');
         }
@@ -1021,18 +1050,19 @@
       }
     }
 
-    // 打開輸入面板並自動繪製該學生該項目的歷史趨勢線
     function openPicker(rowIndex, studentNo, currentVal) {
       state.activeStudentIndex = rowIndex;
       const studentName = state.rawData[rowIndex][1] || '';
       document.getElementById('pStudentName').textContent = `學號：${studentNo} 號 ${studentName ? '(' + studentName + ')' : ''}`;
       document.getElementById('pItemName').textContent = `項目：${state.fieldName} ${state.fieldUnit ? '(' + state.fieldUnit + ')' : ''}`;
 
-      // 渲染歷史成績趨勢線
       renderStudentTrendChart(rowIndex);
 
       const jumpBar = document.getElementById('jumpQuickBar');
       const modeSwitch = document.getElementById('inputModeSwitch');
+
+      // 檢查該學生原本是否有值：若有值則帶入；若無值（空白），則不預設數字
+      const hasExistingVal = (currentVal !== undefined && currentVal !== '' && currentVal !== null);
 
       if (state.inputType === 'toggle') {
         modeSwitch.style.display = 'none';
@@ -1040,30 +1070,40 @@
         document.getElementById('wheelContainer').style.display = 'none';
         document.getElementById('keypadContainer').style.display = 'none';
         document.getElementById('toggleContainer').style.display = 'flex';
-        document.getElementById('currentValDisplay').textContent = currentVal || '未設定';
-        selectToggleVal(currentVal === '有' ? '有' : '無');
+        document.getElementById('currentValDisplay').textContent = hasExistingVal ? currentVal : '-';
+        selectToggleVal(hasExistingVal ? (currentVal === '有' ? '有' : '無') : '無');
       } else {
         modeSwitch.style.display = 'flex';
         document.getElementById('toggleContainer').style.display = 'none';
 
         if (state.inputType === 'customJump') {
           jumpBar.style.display = 'flex';
-          state.jumpSelectedValue = currentVal !== undefined && currentVal !== '' ? currentVal : 80;
+          state.jumpSelectedValue = hasExistingVal ? currentVal : '';
         } else {
           jumpBar.style.display = 'none';
-          state.keypadValueStr = currentVal !== undefined && currentVal !== '' ? String(currentVal) : '';
+          state.keypadValueStr = hasExistingVal ? String(currentVal) : '';
         }
 
-        let numVal = parseFloat(currentVal);
-        if (isNaN(numVal)) numVal = state.minVal || 0;
-        state.tempInt = Math.floor(numVal);
-        state.tempDec = Math.round((numVal - state.tempInt) * 10);
+        if (hasExistingVal) {
+          let numVal = parseFloat(currentVal);
+          if (!isNaN(numVal)) {
+            state.tempInt = Math.floor(numVal);
+            state.tempDec = Math.round((numVal - state.tempInt) * 10);
+          } else {
+            state.tempInt = state.minVal || 0;
+            state.tempDec = 0;
+          }
+        } else {
+          // 沒有舊資料時，滾輪預設停在最小值，但畫面顯示空白 (-)
+          state.tempInt = state.minVal || 0;
+          state.tempDec = 0;
+        }
 
         if (state.inputType === 'customJump') {
           let idx = 0;
           if (currentVal === '不合格') {
             idx = 0;
-          } else if (currentVal !== undefined && currentVal !== '') {
+          } else if (hasExistingVal) {
             const num = parseInt(currentVal);
             const foundIdx = state.customJumpOptions.indexOf(num);
             if (foundIdx !== -1) idx = foundIdx;
@@ -1076,13 +1116,17 @@
           scrollToValue(state.tempInt, state.tempDec);
         }
 
+        // 若沒有舊資料，特別清空計算機與滾輪的顯示文字
+        if (!hasExistingVal) {
+          document.getElementById('currentValDisplay').textContent = '-';
+        }
+
         switchInputMode(state.inputMode);
       }
 
       pickerModal.classList.add('open');
     }
 
-    // 歷史成績折線圖繪製
     function renderStudentTrendChart(studentRowIdx) {
       const headers = state.rawData[0];
       const studentRow = state.rawData[studentRowIdx];
@@ -1091,7 +1135,6 @@
       const labels = [];
       const dataPoints = [];
 
-      // 搜尋所有屬於該基礎項目的欄位數據
       headers.forEach((h, colIdx) => {
         if (h && h.startsWith(baseName)) {
           labels.push(h);
@@ -1124,17 +1167,10 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
+          plugins: { legend: { display: false } },
           scales: {
-            y: {
-              beginAtZero: false,
-              ticks: { font: { size: 10 } }
-            },
-            x: {
-              ticks: { font: { size: 10 } }
-            }
+            y: { ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
           }
         }
       });
@@ -1343,8 +1379,9 @@
       const displayElem = document.getElementById('currentValDisplay');
       if (state.inputType === 'customJump') {
         if (state.inputMode === 'keypad') {
-          displayElem.textContent = state.jumpSelectedValue === '' ? '請輸入或選下方快捷' : (state.jumpSelectedValue === '不合格' ? '不合格' : `${state.jumpSelectedValue} cm`);
+          displayElem.textContent = state.jumpSelectedValue === '' ? '-' : (state.jumpSelectedValue === '不合格' ? '不合格' : `${state.jumpSelectedValue} cm`);
         } else {
+          // 當使用滾輪時，若使用者剛打開且無舊資料，也可以直接讀取當前滾輪位置
           const val = state.customJumpOptions[state.tempCustomIndex];
           displayElem.textContent = val === '不合格' ? '不合格' : `${val} cm`;
         }
@@ -1352,7 +1389,7 @@
       }
 
       if (state.inputMode === 'keypad') {
-        displayElem.textContent = (state.keypadValueStr === '') ? `請按鍵輸入 (${state.fieldUnit})` : `${state.keypadValueStr} ${state.fieldUnit}`;
+        displayElem.textContent = (state.keypadValueStr === '') ? `-` : `${state.keypadValueStr} ${state.fieldUnit}`;
       } else {
         displayElem.textContent = state.hasDecimal ? `${state.tempInt}.${state.tempDec} ${state.fieldUnit}` : `${state.tempInt} ${state.fieldUnit}`;
       }
