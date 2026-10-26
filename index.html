@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>體測數據快速登錄系統</title>
+  <!-- 引入 Chart.js 繪製成績折線圖 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --primary: #2563eb;
@@ -128,6 +130,9 @@
       margin-bottom: 12px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .grid-selector {
@@ -293,6 +298,7 @@
     .btn-secondary { background: #e2e8f0; color: #334155; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-excel { background: #10b981; color: white; }
+    .btn-add-col { background: #8b5cf6; color: white; margin-bottom: 12px; }
 
     /* Modal iOS Picker */
     .modal-overlay {
@@ -321,6 +327,8 @@
       width: 100%;
       max-width: 600px;
       padding: 20px;
+      max-height: 90vh;
+      overflow-y: auto;
       transform: translateY(100%);
       transition: transform 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
       box-shadow: 0 -10px 25px rgba(0,0,0,0.1);
@@ -345,6 +353,17 @@
     .picker-subtitle {
       font-size: 0.85rem;
       color: var(--text-muted);
+    }
+
+    /* 趨勢圖表區域 */
+    .chart-container {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 12px;
+      height: 160px;
+      position: relative;
     }
 
     .mode-switch-group {
@@ -424,10 +443,6 @@
       cursor: grab;
     }
 
-    .wheel-column:active {
-      cursor: grabbing;
-    }
-
     .wheel-scroll {
       position: absolute;
       width: 100%;
@@ -463,8 +478,8 @@
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 14px 0;
-      font-size: 1.4rem;
+      padding: 12px 0;
+      font-size: 1.3rem;
       font-weight: 700;
       color: var(--text);
       text-align: center;
@@ -568,15 +583,6 @@
       text-align: left;
     }
 
-    .help-box ol {
-      padding-left: 20px;
-      margin-top: 6px;
-    }
-
-    .help-box li {
-      margin-bottom: 4px;
-    }
-
     .empty-state {
       text-align: center;
       padding: 40px 20px;
@@ -599,7 +605,7 @@
   </div>
 
   <div class="container">
-    <!-- 步驟 1：動態載入分頁名稱 -->
+    <!-- 步驟 1：班級選擇 -->
     <div class="step-page active" id="step1">
       <div class="section-title">請選擇班別</div>
       <div class="grid-selector" id="classSelectorGrid">
@@ -607,59 +613,13 @@
       </div>
     </div>
 
-    <!-- 步驟 2：選擇項目 -->
+    <!-- 步驟 2：選擇項目 (支援動態載入多輪測量欄位) -->
     <div class="step-page" id="step2">
-      <div class="section-title">請選擇測量項目</div>
-      <div class="item-grid">
-        <div class="item-card" onclick="selectItem(2, '身高', 'cm', 100, 160, true)">
-          <div>
-            <div class="name">身高</div>
-            <div class="unit">單位: cm</div>
-          </div>
-          <span style="font-size: 1.2rem;">📏</span>
-        </div>
-        <div class="item-card" onclick="selectItem(3, '體重', 'kg', 10, 80, true)">
-          <div>
-            <div class="name">體重</div>
-            <div class="unit">單位: kg</div>
-          </div>
-          <span style="font-size: 1.2rem;">⚖️</span>
-        </div>
-        <div class="item-card" onclick="selectItem(4, '手握力', 'kg', 0, 50, true)">
-          <div>
-            <div class="name">手握力</div>
-            <div class="unit">單位: kg</div>
-          </div>
-          <span style="font-size: 1.2rem;">✊</span>
-        </div>
-        <div class="item-card" onclick="selectItem(5, '折返跑', '次', 0, 50, false)">
-          <div>
-            <div class="name">折返跑</div>
-            <div class="unit">單位: 次</div>
-          </div>
-          <span style="font-size: 1.2rem;">🏃</span>
-        </div>
-        <div class="item-card" onclick="selectItem(6, '立定跳遠', 'cm', 0, 0, false, 'customJump')">
-          <div>
-            <div class="name">立定跳遠</div>
-            <div class="unit">&lt;80不合格, 80-100(+5), &gt;100(+1)</div>
-          </div>
-          <span style="font-size: 1.2rem;">👟</span>
-        </div>
-        <div class="item-card" onclick="selectItem(7, '眼鏡', '', 0, 0, false, 'toggle')">
-          <div>
-            <div class="name">眼鏡</div>
-            <div class="unit">有 / 無</div>
-          </div>
-          <span style="font-size: 1.2rem;">👓</span>
-        </div>
-        <div class="item-card" onclick="selectItem(8, '出生年份', '年', 2018, 2021, false)" style="grid-column: span 2;">
-          <div>
-            <div class="name">出生年份</div>
-            <div class="unit">小一 (2018-2021)</div>
-          </div>
-          <span style="font-size: 1.2rem;">📅</span>
-        </div>
+      <div class="section-title">
+        <span>請選擇測量項目</span>
+      </div>
+      <div class="item-grid" id="itemGridContainer">
+        <!-- 動態渲染項目列表 -->
       </div>
       <div class="nav-buttons">
         <button class="btn btn-secondary" onclick="goToStep(1)">⬅️ 重選班別</button>
@@ -668,7 +628,10 @@
 
     <!-- 步驟 3：學生名單與資料點擊輸入 -->
     <div class="step-page" id="step3">
-      <div class="section-title" id="studentListTitle">學生列表</div>
+      <div class="section-title">
+        <span id="studentListTitle">學生列表</span>
+        <button class="btn btn-add-col" style="padding: 6px 12px; font-size: 0.8rem; margin:0;" onclick="addNewMeasurementColumn()">➕ 開啟下一次測量欄位</button>
+      </div>
       <div class="student-list" id="studentList"></div>
       <div class="nav-buttons">
         <button class="btn btn-excel" onclick="exportToExcel()">📥 匯出當前班級 Excel (.csv)</button>
@@ -686,9 +649,14 @@
       <div class="picker-header">
         <div>
           <div class="picker-title" id="pStudentName">學號：1 號</div>
-          <div class="picker-subtitle" id="pItemName">項目：身高 (cm)</div>
+          <div class="picker-subtitle" id="pItemName">項目：立定跳遠 (cm)</div>
         </div>
         <button class="icon-btn" onclick="closePicker()">✕</button>
+      </div>
+
+      <!-- 自動化歷次成績趨勢線圖表 -->
+      <div class="chart-container" id="chartContainer">
+        <canvas id="studentTrendChart"></canvas>
       </div>
 
       <!-- 模式切換按鈕 (計算機 vs 滾輪) -->
@@ -752,22 +720,9 @@
   <!-- API URL 設定彈窗 -->
   <div class="modal-overlay" id="configModal">
     <div class="config-modal">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align- items: center; margin-bottom: 8px;">
         <h2 style="font-size: 1.1rem;">⚙️ Google Apps Script 設定</h2>
-        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="toggleHelp()">❓ 教學</button>
       </div>
-
-      <div class="help-box" id="helpBox" style="display: none;">
-        <strong>💡 如何建立自己的試算表並取得 URL？</strong>
-        <ol>
-          <li>建立自己的 <b>Google 試算表</b>，建立對應的分頁名稱。</li>
-          <li>點擊上方選單 <b>「擴充功能」>「Apps Script」</b>。</li>
-          <li>貼上對應的後端程式碼並點擊右上角 <b>「部署」>「新增部署作業」</b>。</li>
-          <li>類型選擇 <b>「網頁應用程式」</b>，存取權選 <b>「所有人」</b>。</li>
-          <li>複製產生的 <b>網頁應用程式 URL (網址)</b>，貼到下方輸入框中即可！</li>
-        </ol>
-      </div>
-
       <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">請輸入部署的 Web App URL：</p>
       <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
       <div class="modal-actions">
@@ -780,6 +735,17 @@
   <script>
     const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbzQjRhPxTOTOPYK352YFFMfN1n6xRtxZgwtMYlzgnu_9O4FAFEtmNC2QENb9ZevnBY/exec";
 
+    // 基礎預設項目範本
+    const BASE_ITEMS_CONFIG = [
+      { name: '身高', unit: 'cm', min: 100, max: 200, hasDec: true, icon: '📏' },
+      { name: '體重', unit: 'kg', min: 10, max: 120, hasDec: true, icon: '⚖️' },
+      { name: '手握力', unit: 'kg', min: 0, max: 60, hasDec: true, icon: '✊' },
+      { name: '折返跑', unit: '次', min: 0, max: 100, hasDec: false, icon: '🏃' },
+      { name: '立定跳遠', unit: 'cm', min: 0, max: 250, hasDec: false, icon: '👟', type: 'customJump' },
+      { name: '眼鏡', unit: '', min: 0, max: 0, hasDec: false, icon: '👓', type: 'toggle' },
+      { name: '出生年份', unit: '年', min: 2010, max: 2025, hasDec: false, icon: '📅' }
+    ];
+
     let state = {
       apiUrl: localStorage.getItem('gas_api_url') || DEFAULT_API_URL,
       inputMode: localStorage.getItem('preferred_input_mode') || 'keypad',
@@ -787,6 +753,7 @@
       currentClass: '',
       currentField: 2,
       fieldName: '',
+      fieldBaseName: '', // 基礎名稱如 "立定跳遠"
       fieldUnit: '',
       hasDecimal: true,
       minVal: 0,
@@ -800,10 +767,11 @@
       tempToggle: '無',
       tempCustomIndex: 0,
       keypadValueStr: '',
-      jumpSelectedValue: '' // 專門儲存立定跳遠選擇的值 (數字或 '不合格')
+      jumpSelectedValue: ''
     };
 
     const ITEM_HEIGHT = 40;
+    let myChart = null;
 
     const step1 = document.getElementById('step1');
     const step2 = document.getElementById('step2');
@@ -830,11 +798,6 @@
       fetchClassList();
     }
 
-    function toggleHelp() {
-      const box = document.getElementById('helpBox');
-      box.style.display = box.style.display === 'none' ? 'block' : 'none';
-    }
-
     function closeConfigModal() {
       document.getElementById('configModal').classList.remove('open');
     }
@@ -851,17 +814,10 @@
     }
 
     async function fetchClassList() {
-      if (!state.apiUrl) {
-        loadFallbackClasses();
-        return;
-      }
-
       updateSyncStatus('syncing', '● 取得班級中...');
-
       try {
         const res = await fetch(`${state.apiUrl}?action=getSheets`);
         const json = await res.json();
-
         if (json.status === 'success' && json.sheets && json.sheets.length > 0) {
           state.classList = json.sheets;
           localStorage.setItem('cache_sheets', JSON.stringify(state.classList));
@@ -879,29 +835,21 @@
       const cachedSheets = localStorage.getItem('cache_sheets');
       if (cachedSheets) {
         state.classList = JSON.parse(cachedSheets);
-        renderClassSelector(state.classList);
-        updateSyncStatus('offline', '● 離線模式 (使用快取班級)');
       } else {
-        state.classList = ['A班', 'B班', 'C班', 'D班', 'E班'];
-        renderClassSelector(state.classList);
-        updateSyncStatus('offline', '● 離線模式 (僅限離線使用預設班級)');
+        state.classList = ['A班', 'B班', 'C班', 'D班'];
       }
+      renderClassSelector(state.classList);
+      updateSyncStatus('offline', '● 離線模式');
     }
 
     function renderClassSelector(classes) {
       const grid = document.getElementById('classSelectorGrid');
       grid.innerHTML = '';
-
       classes.forEach((cls, index) => {
         const card = document.createElement('div');
         card.className = 'card-btn';
-        if (classes.length % 2 !== 0 && index === classes.length - 1) {
-          card.style.gridColumn = 'span 2';
-        }
-        card.innerHTML = `
-          <div class="title">${cls}</div>
-          <div class="subtitle">點擊進入</div>
-        `;
+        if (classes.length % 2 !== 0 && index === classes.length - 1) card.style.gridColumn = 'span 2';
+        card.innerHTML = `<div class="title">${cls}</div><div class="subtitle">點擊進入</div>`;
         card.onclick = () => selectClass(cls);
         grid.appendChild(card);
       });
@@ -935,45 +883,105 @@
           state.rawData.push([i, ``, "", "", "", "", "", "", ""]);
         }
       }
+      renderItemGrid();
       goToStep(2);
       fetchData();
     }
 
-    function selectItem(fieldIdx, name, unit, min, max, hasDec, type = 'number') {
+    // 動態解析試算表標頭，生成項目按鈕 (自動包含 第2, 3, 4 次項目)
+    function renderItemGrid() {
+      const container = document.getElementById('itemGridContainer');
+      container.innerHTML = '';
+
+      const headers = state.rawData[0] || [];
+
+      // 從欄位索引 2 開始 (0:學號, 1:姓名)
+      for (let colIdx = 2; colIdx < headers.length; colIdx++) {
+        const headerName = headers[colIdx];
+        if (!headerName) continue;
+
+        // 匹配基礎項目類別
+        let matchConfig = BASE_ITEMS_CONFIG.find(item => headerName.startsWith(item.name)) || {
+          name: headerName, unit: '', min: 0, max: 200, hasDec: true, icon: '🎯', type: 'number'
+        };
+
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.onclick = () => selectItem(colIdx, headerName, matchConfig);
+        card.innerHTML = `
+          <div>
+            <div class="name">${headerName}</div>
+            <div class="unit">單位: ${matchConfig.unit || '數值'}</div>
+          </div>
+          <span style="font-size: 1.2rem;">${matchConfig.icon}</span>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function selectItem(fieldIdx, fullName, config) {
       state.currentField = fieldIdx;
-      state.fieldName = name;
-      state.fieldUnit = unit;
-      state.minVal = min;
-      state.maxVal = max;
-      state.hasDecimal = hasDec;
-      state.inputType = type;
+      state.fieldName = fullName;
+      state.fieldBaseName = config.name;
+      state.fieldUnit = config.unit;
+      state.minVal = config.min;
+      state.maxVal = config.max;
+      state.hasDecimal = config.hasDec;
+      state.inputType = config.type || 'number';
 
       document.getElementById('studentListTitle').textContent = `${state.currentClass} - ${state.fieldName}`;
       goToStep(3);
       renderStudentList();
     }
 
+    // 自動新增「第 2, 3, 4 次」測量欄位
+    function addNewMeasurementColumn() {
+      const headers = state.rawData[0];
+      const baseName = state.fieldBaseName;
+
+      // 計算目前已經有幾次該項目
+      let count = 0;
+      headers.forEach(h => {
+        if (h && h.startsWith(baseName)) count++;
+      });
+
+      const nextColName = `${baseName} ${count + 1}`;
+      if (!confirm(`確定要為【${state.currentClass}】自動新增「${nextColName}」欄位嗎？`)) return;
+
+      // 在標頭追加新欄位
+      state.rawData[0].push(nextColName);
+      for (let i = 1; i < state.rawData.length; i++) {
+        state.rawData[i].push("");
+      }
+
+      localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
+      alert(`已成功開啟「${nextColName}」！`);
+      autoUpload();
+      renderItemGrid();
+      
+      // 自動切換至新開啟的欄位
+      const newColIndex = state.rawData[0].length - 1;
+      const baseConfig = BASE_ITEMS_CONFIG.find(item => item.name === baseName) || {};
+      selectItem(newColIndex, nextColName, baseConfig);
+    }
+
     async function fetchData() {
       if (!state.apiUrl || !state.currentClass) return;
-
       updateSyncStatus('syncing', '● 同步中...');
-
       try {
         const res = await fetch(`${state.apiUrl}?action=read&sheetName=${encodeURIComponent(state.currentClass)}`);
         const json = await res.json();
-
         if (json.status === 'success' && json.data && json.data.length > 0) {
           state.rawData = json.data;
           localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
           updateSyncStatus('online', '● 已同步');
-          if (step3.classList.contains('active')) {
-            renderStudentList();
-          }
+          renderItemGrid();
+          if (step3.classList.contains('active')) renderStudentList();
         } else {
-          updateSyncStatus('offline', '● 離線模式 (用本機數據)');
+          updateSyncStatus('offline', '● 離線模式');
         }
       } catch (e) {
-        updateSyncStatus('offline', '● 離線模式 (已暫存)');
+        updateSyncStatus('offline', '● 離線模式');
       }
     }
 
@@ -984,7 +992,6 @@
       }
 
       studentList.innerHTML = '';
-
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
         const num = row[0] || i;
@@ -998,11 +1005,7 @@
 
         let displayVal = '未填寫 ✍️';
         if (hasVal) {
-          if (val === '不合格') {
-            displayVal = '❌ 不合格';
-          } else {
-            displayVal = val + ' ' + state.fieldUnit;
-          }
+          displayVal = (val === '不合格') ? '❌ 不合格' : `${val} ${state.fieldUnit}`;
         }
 
         card.innerHTML = `
@@ -1014,17 +1017,19 @@
             ${displayVal}
           </div>
         `;
-
         studentList.appendChild(card);
       }
     }
 
-    // 打開輸入面板
+    // 打開輸入面板並自動繪製該學生該項目的歷史趨勢線
     function openPicker(rowIndex, studentNo, currentVal) {
       state.activeStudentIndex = rowIndex;
       const studentName = state.rawData[rowIndex][1] || '';
       document.getElementById('pStudentName').textContent = `學號：${studentNo} 號 ${studentName ? '(' + studentName + ')' : ''}`;
       document.getElementById('pItemName').textContent = `項目：${state.fieldName} ${state.fieldUnit ? '(' + state.fieldUnit + ')' : ''}`;
+
+      // 渲染歷史成績趨勢線
+      renderStudentTrendChart(rowIndex);
 
       const jumpBar = document.getElementById('jumpQuickBar');
       const modeSwitch = document.getElementById('inputModeSwitch');
@@ -1077,7 +1082,64 @@
       pickerModal.classList.add('open');
     }
 
-    // 切換輸入模式
+    // 歷史成績折線圖繪製
+    function renderStudentTrendChart(studentRowIdx) {
+      const headers = state.rawData[0];
+      const studentRow = state.rawData[studentRowIdx];
+      const baseName = state.fieldBaseName;
+
+      const labels = [];
+      const dataPoints = [];
+
+      // 搜尋所有屬於該基礎項目的欄位數據
+      headers.forEach((h, colIdx) => {
+        if (h && h.startsWith(baseName)) {
+          labels.push(h);
+          let val = studentRow[colIdx];
+          if (val === '不合格') val = 0;
+          const num = parseFloat(val);
+          dataPoints.push(isNaN(num) ? null : num);
+        }
+      });
+
+      const ctx = document.getElementById('studentTrendChart').getContext('2d');
+      if (myChart) myChart.destroy();
+
+      myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `${baseName} 歷次成績`,
+            data: dataPoints,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            fill: true,
+            tension: 0.3,
+            spanGaps: true,
+            pointRadius: 5,
+            pointBackgroundColor: '#2563eb'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              ticks: { font: { size: 10 } }
+            },
+            x: {
+              ticks: { font: { size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
     function switchInputMode(mode) {
       state.inputMode = mode;
       localStorage.setItem('preferred_input_mode', mode);
@@ -1092,14 +1154,11 @@
         document.getElementById('keypadContainer').style.display = 'none';
         document.getElementById('wheelContainer').style.display = 'flex';
       }
-
       updateDisplayVal();
     }
 
-    // 計算機按鍵點擊處理
     function pressKey(key) {
       if (state.inputType === 'customJump') {
-        // 立定跳遠在計算機模式下可直接當數字輸入
         if (key === 'backspace') {
           state.jumpSelectedValue = String(state.jumpSelectedValue).slice(0, -1);
         } else if (key === '.') {
@@ -1125,7 +1184,6 @@
       updateDisplayVal();
     }
 
-    // 立定跳遠快捷按鈕點擊
     function selectJumpQuick(val) {
       state.jumpSelectedValue = val;
       updateDisplayVal();
@@ -1187,7 +1245,6 @@
         const decScroll = document.getElementById('decScroll');
         decScroll.style.transform = `translateY(${-decVal * ITEM_HEIGHT}px)`;
       }
-
       updateWheelItemStyles();
     }
 
@@ -1200,10 +1257,7 @@
     function setupWheelTouch(colId, scrollId, isInt) {
       const col = document.getElementById(colId);
       const scroll = document.getElementById(scrollId);
-
-      let startY = 0;
-      let currentTransY = 0;
-      let isDragging = false;
+      let startY = 0, currentTransY = 0, isDragging = false;
 
       function getTransY() {
         const transform = scroll.style.transform;
@@ -1223,14 +1277,7 @@
         if (!isDragging) return;
         const delta = y - startY;
         let targetY = currentTransY + delta;
-
-        let maxLen = 10;
-        if (state.inputType === 'customJump') {
-          maxLen = state.customJumpOptions.length;
-        } else {
-          maxLen = isInt ? (state.maxVal - state.minVal + 1) : 10;
-        }
-
+        let maxLen = (state.inputType === 'customJump') ? state.customJumpOptions.length : (isInt ? (state.maxVal - state.minVal + 1) : 10);
         const maxTrans = -(maxLen - 1) * ITEM_HEIGHT;
 
         if (targetY > 0) targetY *= 0.3;
@@ -1246,20 +1293,13 @@
         scroll.style.transition = 'transform 0.15s cubic-bezier(0,0,0.2,1)';
 
         let rawY = getTransY();
-        let maxLen = 10;
-        if (state.inputType === 'customJump') {
-          maxLen = state.customJumpOptions.length;
-        } else {
-          maxLen = isInt ? (state.maxVal - state.minVal + 1) : 10;
-        }
-
+        let maxLen = (state.inputType === 'customJump') ? state.customJumpOptions.length : (isInt ? (state.maxVal - state.minVal + 1) : 10);
         let index = Math.round(-rawY / ITEM_HEIGHT);
 
         if (index < 0) index = 0;
         if (index >= maxLen) index = maxLen - 1;
 
-        const finalY = -index * ITEM_HEIGHT;
-        scroll.style.transform = `translateY(${finalY}px)`;
+        scroll.style.transform = `translateY(${-index * ITEM_HEIGHT}px)`;
 
         if (state.inputType === 'customJump') {
           state.tempCustomIndex = index;
@@ -1277,7 +1317,6 @@
       col.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY));
       col.addEventListener('touchmove', (e) => onMove(e.touches[0].clientY));
       col.addEventListener('touchend', onEnd);
-
       col.addEventListener('mousedown', (e) => onStart(e.clientY));
       window.addEventListener('mousemove', (e) => onMove(e.clientY));
       window.addEventListener('mouseup', onEnd);
@@ -1294,18 +1333,14 @@
 
         const items = scroll.querySelectorAll('.wheel-item');
         items.forEach((item, idx) => {
-          if (idx === activeIdx) {
-            item.classList.add('selected');
-          } else {
-            item.classList.remove('selected');
-          }
+          if (idx === activeIdx) item.classList.add('selected');
+          else item.classList.remove('selected');
         });
       });
     }
 
     function updateDisplayVal() {
       const displayElem = document.getElementById('currentValDisplay');
-
       if (state.inputType === 'customJump') {
         if (state.inputMode === 'keypad') {
           displayElem.textContent = state.jumpSelectedValue === '' ? '請輸入或選下方快捷' : (state.jumpSelectedValue === '不合格' ? '不合格' : `${state.jumpSelectedValue} cm`);
@@ -1317,17 +1352,9 @@
       }
 
       if (state.inputMode === 'keypad') {
-        if (state.keypadValueStr === '') {
-          displayElem.textContent = `請按鍵輸入 (${state.fieldUnit})`;
-        } else {
-          displayElem.textContent = `${state.keypadValueStr} ${state.fieldUnit}`;
-        }
+        displayElem.textContent = (state.keypadValueStr === '') ? `請按鍵輸入 (${state.fieldUnit})` : `${state.keypadValueStr} ${state.fieldUnit}`;
       } else {
-        if (state.hasDecimal) {
-          displayElem.textContent = `${state.tempInt}.${state.tempDec} ${state.fieldUnit}`;
-        } else {
-          displayElem.textContent = `${state.tempInt} ${state.fieldUnit}`;
-        }
+        displayElem.textContent = state.hasDecimal ? `${state.tempInt}.${state.tempDec} ${state.fieldUnit}` : `${state.tempInt} ${state.fieldUnit}`;
       }
     }
 
@@ -1340,7 +1367,6 @@
 
     function confirmAndSave() {
       let finalVal = '';
-
       if (state.inputType === 'toggle') {
         finalVal = state.tempToggle;
       } else if (state.inputType === 'customJump') {
@@ -1374,16 +1400,9 @@
     }
 
     function exportToExcel() {
-      if (!state.rawData || state.rawData.length === 0) {
-        alert('尚無數據可供匯出！');
-        return;
-      }
-
+      if (!state.rawData || state.rawData.length === 0) return alert('尚無數據可供匯出！');
       let csvContent = "\uFEFF";
-      state.rawData.forEach(row => {
-        csvContent += row.join(",") + "\n";
-      });
-
+      state.rawData.forEach(row => csvContent += row.join(",") + "\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -1396,27 +1415,17 @@
 
     async function autoUpload() {
       if (!state.apiUrl) return;
-
       updateSyncStatus('syncing', '▲ 上傳中...');
-
       try {
-        const payload = {
-          sheetName: state.currentClass,
-          data: state.rawData
-        };
-
+        const payload = { sheetName: state.currentClass, data: state.rawData };
         const res = await fetch(state.apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
-
         const json = await res.json();
-        if (json.status === 'success') {
-          updateSyncStatus('online', '● 已連線同步');
-        } else {
-          updateSyncStatus('offline', '● 儲存失敗 (已暫存本機)');
-        }
+        if (json.status === 'success') updateSyncStatus('online', '● 已連線同步');
+        else updateSyncStatus('offline', '● 儲存失敗 (已暫存本機)');
       } catch (err) {
         updateSyncStatus('offline', '● 離線 (已暫存本機)');
       }
