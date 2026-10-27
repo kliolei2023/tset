@@ -154,6 +154,8 @@
       flex-direction: column;
       align-items: center;
       gap: 8px;
+      position: relative;
+      z-index: 10;
     }
 
     .card-btn:active {
@@ -266,9 +268,24 @@
       background: #f1f5f9;
     }
 
-    .student-card.has-value {
-      border-left: 5px solid var(--success);
+    /* 成績等級邊框與紅綠燈標籤 */
+    .student-card.grade-excellent { border-left: 6px solid #10b981; }
+    .student-card.grade-good { border-left: 6px solid #3b82f6; }
+    .student-card.grade-pass { border-left: 6px solid #f59e0b; }
+    .student-card.grade-fail { border-left: 6px solid #ef4444; }
+
+    .grade-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-left: 6px;
     }
+
+    .grade-badge.excellent { background: #d1fae5; color: #047857; }
+    .grade-badge.good { background: #dbeafe; color: #1e40af; }
+    .grade-badge.pass { background: #fef3c7; color: #b45309; }
+    .grade-badge.fail { background: #fee2e2; color: #b91c1c; }
 
     .student-info {
       display: flex;
@@ -603,12 +620,14 @@
       overflow-y: auto;
     }
 
-    .config-modal input {
+    .config-modal input, .config-modal select {
       width: 100%;
       padding: 10px;
       border: 1px solid var(--border);
       border-radius: 8px;
       margin: 8px 0 16px;
+      font-size: 1rem;
+      background: #fff;
     }
 
     .empty-state {
@@ -624,7 +643,8 @@
     <h1>📋 體測數據登錄</h1>
     <div style="display: flex; align-items: center; gap: 8px;">
       <div id="syncStatus" class="sync-status online">● 已連線</div>
-      <button class="icon-btn" id="openConfig">⚙️</button>
+      <button class="icon-btn" id="openNormsConfig" title="設定常模評分標準">🎯</button>
+      <button class="icon-btn" id="openConfig" title="系統設定">⚙️</button>
     </div>
   </header>
 
@@ -641,7 +661,7 @@
       </div>
     </div>
 
-    <!-- 步驟 2：選擇項目 (只顯示基礎項目 + 自訂新增項目) -->
+    <!-- 步驟 2：選擇項目 -->
     <div class="step-page" id="step2">
       <div class="section-title">
         <span>請選擇測量項目</span>
@@ -690,6 +710,46 @@
           <button class="btn btn-secondary" onclick="goToStep(2)">⬅️ 重選項目</button>
           <button class="btn btn-primary" onclick="fetchData()">🔄 重新載入</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 常模評分標準設定彈窗 -->
+  <div class="modal-overlay" id="normsModal">
+    <div class="config-modal">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h2 style="font-size: 1.1rem;" id="normsModalTitle">🎯 設定評分常模標準</h2>
+        <button class="icon-btn" onclick="closeNormsModal()">✕</button>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;" id="normsModalSub">為當前項目設定達標判定方式：</p>
+      
+      <label style="font-size: 0.85rem; font-weight: 700;">判定模式：</label>
+      <select id="normTypeSelect" onchange="onNormTypeChange(this.value)">
+        <option value="fixed">固定標準（老師自訂分數門檻）</option>
+        <option value="mean_std">平均數與標準差法（自動依全班分佈）</option>
+        <option value="median">中位數法（以全班中位數為基準）</option>
+      </select>
+
+      <div id="fixedThresholdContainer">
+        <label style="font-size: 0.85rem; font-weight: 700;">🏆 特優門檻 (>=)</label>
+        <input type="number" id="normExcInput" placeholder="例如: 170">
+        
+        <label style="font-size: 0.85rem; font-weight: 700;">🔵 良好門檻 (>=)</label>
+        <input type="number" id="normGoodInput" placeholder="例如: 145">
+        
+        <label style="font-size: 0.85rem; font-weight: 700;">🟡 合格門檻 (>=)</label>
+        <input type="number" id="normPassInput" placeholder="例如: 110">
+      </div>
+
+      <div id="dynamicDescBox" style="background: var(--bg); padding: 10px; border-radius: 8px; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; display: none;">
+        <b>動態常模說明：</b><br>
+        • <b>平均數與標準差</b>：平均數以上為良好，平均數 + 0.5倍標準差為特優，平均數 - 0.5倍標準差為合格。<br>
+        • <b>中位數</b>：中位數以上為良好，中位數以下為合格，低於中位數很多則為待加強。
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeNormsModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveNormsConfig()">儲存設定</button>
       </div>
     </div>
   </div>
@@ -796,6 +856,12 @@
       { name: '出生年份', unit: '年', min: 2010, max: 2025, hasDec: false, icon: '📅' }
     ];
 
+    let normsRules = JSON.parse(localStorage.getItem('norms_rules_config') || JSON.stringify({
+      '立定跳遠': { type: 'fixed', exc: 170, good: 145, pass: 110 },
+      '手握力': { type: 'fixed', exc: 30, good: 22, pass: 15 },
+      '折返跑': { type: 'fixed', exc: 40, good: 30, pass: 20 }
+    }));
+
     let state = {
       apiUrl: localStorage.getItem('gas_api_url') || DEFAULT_API_URL,
       inputMode: localStorage.getItem('preferred_input_mode') || 'keypad',
@@ -830,11 +896,15 @@
     const studentList = document.getElementById('studentList');
     const syncStatus = document.getElementById('syncStatus');
     const pickerModal = document.getElementById('pickerModal');
+    const normsModal = document.getElementById('normsModal');
 
     function init() {
       document.getElementById('apiUrlInput').value = state.apiUrl;
       document.getElementById('openConfig').addEventListener('click', () => {
         document.getElementById('configModal').classList.add('open');
+      });
+      document.getElementById('openNormsConfig').addEventListener('click', () => {
+        openNormsModal();
       });
 
       state.customJumpOptions = ['不合格', 80, 85, 90, 95];
@@ -863,6 +933,53 @@
       }
     }
 
+    function openNormsModal() {
+      if (!state.fieldBaseName) {
+        alert("請先在步驟二選擇一個測量項目，才能設定其評分常模！");
+        return;
+      }
+      document.getElementById('normsModalTitle').textContent = `🎯 設定【${state.fieldBaseName}】評分常模`;
+      
+      let rule = normsRules[state.fieldBaseName] || { type: 'fixed', exc: 100, good: 80, pass: 60 };
+      document.getElementById('normTypeSelect').value = rule.type;
+      document.getElementById('normExcInput').value = rule.exc || '';
+      document.getElementById('normGoodInput').value = rule.good || '';
+      document.getElementById('normPassInput').value = rule.pass || '';
+      
+      onNormTypeChange(rule.type);
+      normsModal.classList.add('open');
+    }
+
+    function closeNormsModal() {
+      normsModal.classList.remove('open');
+    }
+
+    function onNormTypeChange(val) {
+      const fixedBox = document.getElementById('fixedThresholdContainer');
+      const descBox = document.getElementById('dynamicDescBox');
+      if (val === 'fixed') {
+        fixedBox.style.display = 'block';
+        descBox.style.display = 'none';
+      } else {
+        fixedBox.style.display = 'none';
+        descBox.style.display = 'block';
+      }
+    }
+
+    function saveNormsConfig() {
+      const type = document.getElementById('normTypeSelect').value;
+      normsRules[state.fieldBaseName] = {
+        type: type,
+        exc: parseFloat(document.getElementById('normExcInput').value) || 0,
+        good: parseFloat(document.getElementById('normGoodInput').value) || 0,
+        pass: parseFloat(document.getElementById('normPassInput').value) || 0
+      };
+      localStorage.setItem('norms_rules_config', JSON.stringify(normsRules));
+      closeNormsModal();
+      alert(`【${state.fieldBaseName}】常模設定已更新！`);
+      renderStudentList();
+    }
+
     async function fetchClassList() {
       updateSyncStatus('syncing', '● 取得班級中...');
       try {
@@ -886,7 +1003,7 @@
       if (cachedSheets) {
         state.classList = JSON.parse(cachedSheets);
       } else {
-        state.classList = ['A班', 'B班', 'C班', 'D班'];
+        state.classList = ['小一敬', 'A班', 'B班', 'C班'];
       }
       renderClassSelector(state.classList);
       updateSyncStatus('offline', '● 離線模式');
@@ -895,10 +1012,13 @@
     function renderClassSelector(classes) {
       const grid = document.getElementById('classSelectorGrid');
       grid.innerHTML = '';
-      classes.forEach((cls, index) => {
+      classes.forEach((cls) => {
         const card = document.createElement('div');
         card.className = 'card-btn';
-        if (classes.length % 2 !== 0 && index === classes.length - 1) card.style.gridColumn = 'span 2';
+        // 不論總數為何，皆維持滿格或整行延展，確保點擊範圍絕對安全
+        if (classes.length === 1) {
+          card.style.gridColumn = 'span 2';
+        }
         card.innerHTML = `<div class="title">${cls}</div><div class="subtitle">點擊進入</div>`;
         card.onclick = () => selectClass(cls);
         grid.appendChild(card);
@@ -938,7 +1058,6 @@
       fetchData();
     }
 
-    // 渲染基礎項目卡片，並在最後新增一個「自訂新項目」按鈕
     function renderItemGrid() {
       const container = document.getElementById('itemGridContainer');
       container.innerHTML = '';
@@ -973,7 +1092,6 @@
         container.appendChild(card);
       }
 
-      // 新增「自訂新項目」卡片
       const customCard = document.createElement('div');
       customCard.className = 'item-card add-custom';
       customCard.onclick = () => createNewCustomItem();
@@ -984,14 +1102,11 @@
       container.appendChild(customCard);
     }
 
-    // 點擊新增「自訂新項目」
     function createNewCustomItem() {
       const newItemName = prompt("請輸入新增的測量項目名稱 (例如：仰臥起坐、坐姿體前彎):");
       if (!newItemName || newItemName.trim() === '') return;
 
       const trimmedName = newItemName.trim();
-
-      // 檢查是否已存在該項目
       const headers = state.rawData[0] || [];
       if (headers.includes(trimmedName)) {
         alert("該項目已經存在，將直接進入該項目！");
@@ -1002,7 +1117,6 @@
 
       const newItemUnit = prompt(`請輸入「${trimmedName}」的單位 (例如：次、cm、秒，若無可留空):`, "") || "";
 
-      // 在標頭資料加入新欄位
       state.rawData[0].push(trimmedName);
       for (let i = 1; i < state.rawData.length; i++) {
         state.rawData[i].push("");
@@ -1145,6 +1259,51 @@
       }
     }
 
+    function evaluateGrade(val, numericVals) {
+      if (val === undefined || val === '' || val === null) return null;
+      if (val === '不合格') return { key: 'fail', label: '待加強' };
+
+      const num = parseFloat(val);
+      if (isNaN(num)) return null;
+
+      let rule = normsRules[state.fieldBaseName] || { type: 'fixed', exc: 100, good: 80, pass: 60 };
+
+      if (rule.type === 'fixed') {
+        if (num >= rule.exc) return { key: 'excellent', label: '特優' };
+        if (num >= rule.good) return { key: 'good', label: '良好' };
+        if (num >= rule.pass) return { key: 'pass', label: '合格' };
+        return { key: 'fail', label: '待加強' };
+      } 
+      
+      if (numericVals.length === 0) return { key: 'pass', label: '合格' };
+
+      if (rule.type === 'mean_std') {
+        const mean = numericVals.reduce((a, b) => a + b, 0) / numericVals.length;
+        const variance = numericVals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / numericVals.length;
+        const stdDev = Math.sqrt(variance);
+
+        if (num >= mean + 0.5 * stdDev) return { key: 'excellent', label: '特優' };
+        if (num >= mean) return { key: 'good', label: '良好' };
+        if (num >= mean - 0.5 * stdDev) return { key: 'pass', label: '合格' };
+        return { key: 'fail', label: '待加強' };
+      }
+
+      if (rule.type === 'median') {
+        const sorted = [...numericVals].sort((a, b) => a - b);
+        let median = sorted[Math.floor(sorted.length / 2)];
+        if (sorted.length % 2 === 0) {
+          median = (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+        }
+
+        if (num >= median * 1.15) return { key: 'excellent', label: '特優' };
+        if (num >= median) return { key: 'good', label: '良好' };
+        if (num >= median * 0.85) return { key: 'pass', label: '合格' };
+        return { key: 'fail', label: '待加強' };
+      }
+
+      return { key: 'pass', label: '合格' };
+    }
+
     function renderStudentList() {
       if (!state.rawData || state.rawData.length <= 1) {
         studentList.innerHTML = `<div class="empty-state">尚無數據，已為您準備本機暫存環境</div>`;
@@ -1152,26 +1311,39 @@
         return;
       }
 
+      let numericVals = [];
+      for (let i = 1; i < state.rawData.length; i++) {
+        let val = state.rawData[i][state.currentField];
+        if (val !== undefined && val !== '' && val !== null && val !== '不合格') {
+          let p = parseFloat(val);
+          if (!isNaN(p)) numericVals.push(p);
+        }
+      }
+
       studentList.innerHTML = '';
       let filledCount = 0;
       let totalStudents = state.rawData.length - 1;
-      let numericVals = [];
 
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
         const num = row[0] || i;
         const name = row[1] || '';
         const val = row[state.currentField];
-        const hasVal = val !== undefined && val !== '';
+        const hasVal = val !== undefined && val !== '' && val !== null;
 
-        if (hasVal) {
-          filledCount++;
-          let numParsed = parseFloat(val);
-          if (!isNaN(numParsed)) numericVals.push(numParsed);
+        if (hasVal) filledCount++;
+
+        const gradeObj = evaluateGrade(val, numericVals);
+        let gradeClass = '';
+        let badgeHtml = '';
+
+        if (gradeObj) {
+          gradeClass = `grade-${gradeObj.key}`;
+          badgeHtml = `<span class="grade-badge ${gradeObj.key}">${gradeObj.label}</span>`;
         }
 
         const card = document.createElement('div');
-        card.className = `student-card ${hasVal ? 'has-value' : ''}`;
+        card.className = `student-card ${gradeClass}`;
         card.onclick = () => openPicker(i, num, val);
 
         let displayVal = '未填寫 ✍️';
@@ -1182,7 +1354,7 @@
         card.innerHTML = `
           <div class="student-info">
             <div class="student-no">${num}</div>
-            <div class="student-name">${name}</div>
+            <div class="student-name">${name} ${badgeHtml}</div>
           </div>
           <div class="student-value ${hasVal ? 'filled' : ''}">
             ${displayVal}
