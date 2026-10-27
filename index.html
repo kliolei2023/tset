@@ -195,6 +195,14 @@
       border-color: var(--primary);
     }
 
+    .item-card.add-custom {
+      border: 2px dashed var(--primary);
+      background: var(--primary-light);
+      justify-content: center;
+      gap: 8px;
+      color: var(--primary);
+    }
+
     .item-card .name {
       font-weight: 700;
       font-size: 1rem;
@@ -203,6 +211,37 @@
     .item-card .unit {
       font-size: 0.8rem;
       color: var(--text-muted);
+    }
+
+    /* 統計摘要面板樣式 */
+    .stats-dashboard {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: center;
+    }
+
+    .stat-item {
+      background: var(--bg);
+      padding: 8px;
+      border-radius: 10px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--primary);
     }
 
     .student-list {
@@ -299,6 +338,7 @@
     .btn-primary { background: var(--primary); color: white; }
     .btn-excel { background: #10b981; color: white; }
     .btn-add-col { background: #8b5cf6; color: white; }
+    .btn-batch { background: #f59e0b; color: white; }
 
     /* Modal iOS Picker */
     .modal-overlay {
@@ -601,7 +641,7 @@
       </div>
     </div>
 
-    <!-- 步驟 2：選擇項目 -->
+    <!-- 步驟 2：選擇項目 (只顯示基礎項目 + 自訂新增項目) -->
     <div class="step-page" id="step2">
       <div class="section-title">
         <span>請選擇測量項目</span>
@@ -614,13 +654,31 @@
 
     <!-- 步驟 3：學生名單與資料點擊輸入 -->
     <div class="step-page" id="step3">
+      <!-- 頂部控制面板：欄位切換與批次操作 -->
       <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">切換測量欄位 (檢視/修改)：</span>
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">切換測量次數：</span>
           <select id="columnSwitcherSelect" onchange="switchColumnBySelect(this.value)" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.9rem; font-weight: bold; color: var(--primary); background: var(--bg);"></select>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button class="btn btn-add-col" style="flex:1; padding: 8px; font-size: 0.85rem;" onclick="addNewMeasurementColumn()">➕ 開啟下一次測量欄位</button>
+          <button class="btn btn-add-col" style="flex:1; padding: 8px; font-size: 0.85rem;" onclick="addNewMeasurementColumn()">➕ 開啟下一次欄位</button>
+          <button class="btn btn-batch" style="flex:1; padding: 8px; font-size: 0.85rem;" onclick="openBatchModal()">⚡ 批次填入空白</button>
+        </div>
+      </div>
+
+      <!-- 統計摘要面板 (Dashboard) -->
+      <div class="stats-dashboard" id="statsDashboard">
+        <div class="stat-item">
+          <div class="stat-label">已測 / 未測</div>
+          <div class="stat-value" id="statProgress">0 / 0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">平均值</div>
+          <div class="stat-value" id="statAvg">-</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">最高 / 最低</div>
+          <div class="stat-value" id="statHighLow">- / -</div>
         </div>
       </div>
 
@@ -860,7 +918,7 @@
         breadcrumb.innerHTML = `<span onclick="goToStep(1)">${state.currentClass}</span> ➔ <span class="active">選擇項目</span>`;
       } else if (stepNum === 3) {
         step3.classList.add('active');
-        breadcrumb.innerHTML = `<span onclick="goToStep(1)">${state.currentClass}</span> ➔ <span onclick="goToStep(2)">${state.fieldName}</span> ➔ <span class="active">登錄數據</span>`;
+        breadcrumb.innerHTML = `<span onclick="goToStep(1)">${state.currentClass}</span> ➔ <span onclick="goToStep(2)">${state.fieldBaseName}</span> ➔ <span class="active">登錄數據</span>`;
       }
     }
 
@@ -880,31 +938,85 @@
       fetchData();
     }
 
+    // 渲染基礎項目卡片，並在最後新增一個「自訂新項目」按鈕
     function renderItemGrid() {
       const container = document.getElementById('itemGridContainer');
       container.innerHTML = '';
 
       const headers = state.rawData[0] || [];
+      const renderedBaseNames = new Set();
+
       for (let colIdx = 2; colIdx < headers.length; colIdx++) {
         const headerName = headers[colIdx];
         if (!headerName) continue;
 
-        let matchConfig = BASE_ITEMS_CONFIG.find(item => headerName.startsWith(item.name)) || {
-          name: headerName, unit: '', min: 0, max: 200, hasDec: true, icon: '🎯', type: 'number'
-        };
+        let matchConfig = BASE_ITEMS_CONFIG.find(item => headerName.startsWith(item.name));
+        let baseName = matchConfig ? matchConfig.name : headerName.replace(/\s+\d+$/, '');
+
+        if (renderedBaseNames.has(baseName)) continue;
+        renderedBaseNames.add(baseName);
+
+        if (!matchConfig) {
+          matchConfig = { name: baseName, unit: '', min: 0, max: 200, hasDec: true, icon: '🎯', type: 'number' };
+        }
 
         const card = document.createElement('div');
         card.className = 'item-card';
-        card.onclick = () => selectItem(colIdx, headerName, matchConfig);
+        card.onclick = () => selectItem(colIdx, baseName, matchConfig);
         card.innerHTML = `
           <div>
-            <div class="name">${headerName}</div>
+            <div class="name">${baseName}</div>
             <div class="unit">單位: ${matchConfig.unit || '數值'}</div>
           </div>
           <span style="font-size: 1.2rem;">${matchConfig.icon}</span>
         `;
         container.appendChild(card);
       }
+
+      // 新增「自訂新項目」卡片
+      const customCard = document.createElement('div');
+      customCard.className = 'item-card add-custom';
+      customCard.onclick = () => createNewCustomItem();
+      customCard.innerHTML = `
+        <span style="font-size: 1.3rem;">➕</span>
+        <div class="name">自訂新項目</div>
+      `;
+      container.appendChild(customCard);
+    }
+
+    // 點擊新增「自訂新項目」
+    function createNewCustomItem() {
+      const newItemName = prompt("請輸入新增的測量項目名稱 (例如：仰臥起坐、坐姿體前彎):");
+      if (!newItemName || newItemName.trim() === '') return;
+
+      const trimmedName = newItemName.trim();
+
+      // 檢查是否已存在該項目
+      const headers = state.rawData[0] || [];
+      if (headers.includes(trimmedName)) {
+        alert("該項目已經存在，將直接進入該項目！");
+        const existingIdx = headers.indexOf(trimmedName);
+        selectItem(existingIdx, trimmedName, { name: trimmedName, unit: '', min: 0, max: 200, hasDec: true, icon: '🎯', type: 'number' });
+        return;
+      }
+
+      const newItemUnit = prompt(`請輸入「${trimmedName}」的單位 (例如：次、cm、秒，若無可留空):`, "") || "";
+
+      // 在標頭資料加入新欄位
+      state.rawData[0].push(trimmedName);
+      for (let i = 1; i < state.rawData.length; i++) {
+        state.rawData[i].push("");
+      }
+
+      localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
+      alert(`已成功新增「${trimmedName}」項目！`);
+      autoUpload();
+
+      const newColIdx = state.rawData[0].length - 1;
+      const newConfig = { name: trimmedName, unit: newItemUnit.trim(), min: 0, max: 200, hasDec: true, icon: '🎯', type: 'number' };
+      
+      renderItemGrid();
+      selectItem(newColIdx, trimmedName, newConfig);
     }
 
     function selectItem(fieldIdx, fullName, config) {
@@ -948,19 +1060,19 @@
       const fullName = headers[colIdx];
 
       let matchConfig = BASE_ITEMS_CONFIG.find(item => fullName.startsWith(item.name)) || {
-        name: fullName, unit: '', min: 0, max: 200, hasDec: true, type: 'number'
+        name: fullName, unit: state.fieldUnit, min: 0, max: 200, hasDec: true, type: 'number'
       };
 
       state.currentField = colIdx;
       state.fieldName = fullName;
       state.fieldBaseName = matchConfig.name;
-      state.fieldUnit = matchConfig.unit;
+      state.fieldUnit = matchConfig.unit || state.fieldUnit;
       state.minVal = matchConfig.min;
       state.maxVal = matchConfig.max;
       state.hasDecimal = matchConfig.hasDec;
       state.inputType = matchConfig.type || 'number';
 
-      breadcrumb.innerHTML = `<span onclick="goToStep(1)">${state.currentClass}</span> ➔ <span onclick="goToStep(2)">${state.fieldName}</span> ➔ <span class="active">登錄數據</span>`;
+      breadcrumb.innerHTML = `<span onclick="goToStep(1)">${state.currentClass}</span> ➔ <span onclick="goToStep(2)">${state.fieldBaseName}</span> ➔ <span class="active">登錄數據</span>`;
       renderStudentList();
     }
 
@@ -987,8 +1099,27 @@
       renderItemGrid();
       
       const newColIndex = state.rawData[0].length - 1;
-      const baseConfig = BASE_ITEMS_CONFIG.find(item => item.name === baseName) || {};
+      const baseConfig = BASE_ITEMS_CONFIG.find(item => item.name === baseName) || { name: baseName, unit: state.fieldUnit };
       selectItem(newColIndex, nextColName, baseConfig);
+    }
+
+    function openBatchModal() {
+      const valInput = prompt(`請輸入要批次套用到所有「尚未填寫」學生的預設數值 (${state.fieldUnit || '數值'}):`);
+      if (valInput === null || valInput.trim() === '') return;
+
+      let count = 0;
+      for (let i = 1; i < state.rawData.length; i++) {
+        const currentVal = state.rawData[i][state.currentField];
+        if (currentVal === undefined || currentVal === '') {
+          state.rawData[i][state.currentField] = isNaN(valInput) ? valInput : parseFloat(valInput);
+          count++;
+        }
+      }
+
+      localStorage.setItem(`cache_${state.currentClass}`, JSON.stringify(state.rawData));
+      alert(`已成功為 ${count} 位未填寫學生批次填入數值！`);
+      renderStudentList();
+      autoUpload();
     }
 
     async function fetchData() {
@@ -1017,16 +1148,27 @@
     function renderStudentList() {
       if (!state.rawData || state.rawData.length <= 1) {
         studentList.innerHTML = `<div class="empty-state">尚無數據，已為您準備本機暫存環境</div>`;
+        updateStats(0, 0, []);
         return;
       }
 
       studentList.innerHTML = '';
+      let filledCount = 0;
+      let totalStudents = state.rawData.length - 1;
+      let numericVals = [];
+
       for (let i = 1; i < state.rawData.length; i++) {
         const row = state.rawData[i];
         const num = row[0] || i;
         const name = row[1] || '';
         const val = row[state.currentField];
         const hasVal = val !== undefined && val !== '';
+
+        if (hasVal) {
+          filledCount++;
+          let numParsed = parseFloat(val);
+          if (!isNaN(numParsed)) numericVals.push(numParsed);
+        }
 
         const card = document.createElement('div');
         card.className = `student-card ${hasVal ? 'has-value' : ''}`;
@@ -1048,6 +1190,28 @@
         `;
         studentList.appendChild(card);
       }
+
+      updateStats(filledCount, totalStudents, numericVals);
+    }
+
+    function updateStats(filledCount, totalStudents, numericVals) {
+      document.getElementById('statProgress').textContent = `${filledCount} / ${totalStudents}`;
+      
+      const avgElem = document.getElementById('statAvg');
+      const highLowElem = document.getElementById('statHighLow');
+
+      if (numericVals.length > 0) {
+        const sum = numericVals.reduce((a, b) => a + b, 0);
+        const avg = (sum / numericVals.length).toFixed(1);
+        const max = Math.max(...numericVals);
+        const min = Math.min(...numericVals);
+
+        avgElem.textContent = `${avg} ${state.fieldUnit}`;
+        highLowElem.textContent = `${max} / ${min}`;
+      } else {
+        avgElem.textContent = `-`;
+        highLowElem.textContent = `- / -`;
+      }
     }
 
     function openPicker(rowIndex, studentNo, currentVal) {
@@ -1060,8 +1224,6 @@
 
       const jumpBar = document.getElementById('jumpQuickBar');
       const modeSwitch = document.getElementById('inputModeSwitch');
-
-      // 檢查該學生原本是否有值：若有值則帶入；若無值（空白），則不預設數字
       const hasExistingVal = (currentVal !== undefined && currentVal !== '' && currentVal !== null);
 
       if (state.inputType === 'toggle') {
@@ -1094,7 +1256,6 @@
             state.tempDec = 0;
           }
         } else {
-          // 沒有舊資料時，滾輪預設停在最小值，但畫面顯示空白 (-)
           state.tempInt = state.minVal || 0;
           state.tempDec = 0;
         }
@@ -1116,7 +1277,6 @@
           scrollToValue(state.tempInt, state.tempDec);
         }
 
-        // 若沒有舊資料，特別清空計算機與滾輪的顯示文字
         if (!hasExistingVal) {
           document.getElementById('currentValDisplay').textContent = '-';
         }
@@ -1381,7 +1541,6 @@
         if (state.inputMode === 'keypad') {
           displayElem.textContent = state.jumpSelectedValue === '' ? '-' : (state.jumpSelectedValue === '不合格' ? '不合格' : `${state.jumpSelectedValue} cm`);
         } else {
-          // 當使用滾輪時，若使用者剛打開且無舊資料，也可以直接讀取當前滾輪位置
           const val = state.customJumpOptions[state.tempCustomIndex];
           displayElem.textContent = val === '不合格' ? '不合格' : `${val} cm`;
         }
